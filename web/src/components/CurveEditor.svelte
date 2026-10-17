@@ -20,38 +20,63 @@
     label: string
   } = $props()
 
-  const DOMAINS: Record<Probe, [number, number]> = {
-    cpu: [20, 100],
-    hdd: [15, 60],
-    ssd: [20, 80],
-    nvme: [20, 90],
-    board: [15, 80],
+  /** Range where precision matters, per kind of sensor: it gets most of the width. */
+  const USEFUL: Record<Probe, [number, number]> = {
+    cpu: [20, 90],
+    hdd: [25, 55],
+    ssd: [25, 70],
+    nvme: [30, 80],
+    board: [20, 70],
   }
 
   const W = 640
-  const H = 280
+  const H = 320
   const PAD = { left: 40, right: 14, top: 14, bottom: 30 }
+  const PLOT_W = W - PAD.left - PAD.right
+  /** Share of the width given to each side outside the useful range. */
+  const SQUEEZED = 0.08
 
   const domain = $derived.by((): [number, number] => {
-    const [lo, hi] = DOMAINS[probe]
+    const [lo, hi] = USEFUL[probe]
     const temps = points.map((p) => p[0])
     return [
       Math.min(lo, ...temps.map((t) => Math.floor(t / 5) * 5 - 5)),
-      Math.max(hi, ...temps.map((t) => t + 5)),
+      Math.max(hi, ...temps.map((t) => Math.ceil(t / 5) * 5 + 5)),
     ]
   })
 
-  const x = (t: number) => PAD.left + ((t - domain[0]) / (domain[1] - domain[0])) * (W - PAD.left - PAD.right)
+  // Piecewise-linear temperature axis: [start, low] and [high, end] are squeezed on the sides.
+  const low = $derived(Math.max(domain[0], USEFUL[probe][0]))
+  const high = $derived(Math.min(domain[1], USEFUL[probe][1]))
+  const stops = $derived.by(() => {
+    const before = low > domain[0] ? SQUEEZED : 0
+    const after = high < domain[1] ? SQUEEZED : 0
+    return { temps: [domain[0], low, high, domain[1]], shares: [0, before, 1 - after, 1] }
+  })
+
+  function lerpStops(value: number, from: number[], to: number[]): number {
+    for (let i = 1; i < from.length; i++) {
+      if (value <= from[i] || i === from.length - 1) {
+        const span = from[i] - from[i - 1]
+        return span === 0 ? to[i] : to[i - 1] + ((value - from[i - 1]) / span) * (to[i] - to[i - 1])
+      }
+    }
+    return to[to.length - 1]
+  }
+
+  const x = (t: number) => PAD.left + lerpStops(t, stops.temps, stops.shares) * PLOT_W
+  const tempOf = (px: number) => lerpStops((px - PAD.left) / PLOT_W, stops.shares, stops.temps)
   const y = (d: number) => H - PAD.bottom - (d / 100) * (H - PAD.top - PAD.bottom)
-  const tempOf = (px: number) =>
-    domain[0] + ((px - PAD.left) / (W - PAD.left - PAD.right)) * (domain[1] - domain[0])
   const dutyOf = (py: number) => ((H - PAD.bottom - py) / (H - PAD.top - PAD.bottom)) * 100
 
-  const xTicks = $derived.by(() => {
-    const ticks: number[] = []
-    const step = domain[1] - domain[0] > 60 ? 10 : 5
-    for (let t = Math.ceil(domain[0] / step) * step; t <= domain[1]; t += step) ticks.push(t)
-    return ticks
+  /** Vertical grid every 5°C over the useful range; labels thinned out when the range is wide. */
+  const xGrid = $derived.by(() => {
+    const lines: { t: number; label: boolean }[] = []
+    const labelStep = high - low > 50 ? 10 : 5
+    for (let t = Math.ceil(low / 5) * 5; t <= high; t += 5) lines.push({ t, label: t % labelStep === 0 })
+    if (low > domain[0]) lines.unshift({ t: domain[0], label: true })
+    if (high < domain[1]) lines.push({ t: domain[1], label: true })
+    return lines
   })
 
   const path = $derived.by(() => {
@@ -61,6 +86,8 @@
       ...points,
       [domain[1], points[points.length - 1][1]],
     ]
+    for (const t of [low, high]) if (!points.some((p) => p[0] === t)) coords.push([t, dutyAt(points, t)])
+    coords.sort((a, b) => a[0] - b[0])
     return coords.map(([t, d], i) => `${i ? 'L' : 'M'}${x(t).toFixed(1)},${y(d).toFixed(1)}`).join(' ')
   })
 
@@ -153,12 +180,29 @@
       onpointerdown={onPlotDown}
     />
 
+    {#if low > domain[0]}
+      <rect class="squeezed" x={PAD.left} y={PAD.top} width={x(low) - PAD.left} height={y(0) - PAD.top} />
+    {/if}
+    {#if high < domain[1]}
+      <rect
+        class="squeezed"
+        x={x(high)}
+        y={PAD.top}
+        width={W - PAD.right - x(high)}
+        height={y(0) - PAD.top}
+      />
+    {/if}
+    {#each [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as d (d)}
+      <line class="grid" class:major={d % 25 === 0} x1={PAD.left} x2={W - PAD.right} y1={y(d)} y2={y(d)} />
+    {/each}
     {#each [0, 25, 50, 75, 100] as d (d)}
-      <line class="grid" x1={PAD.left} x2={W - PAD.right} y1={y(d)} y2={y(d)} />
       <text class="tick" x={PAD.left - 6} y={y(d) + 4} text-anchor="end">{d}%</text>
     {/each}
-    {#each xTicks as t (t)}
-      <text class="tick" x={x(t)} y={H - PAD.bottom + 18} text-anchor="middle">{t}°</text>
+    {#each xGrid as g (g.t)}
+      <line class="grid" class:major={g.label} x1={x(g.t)} x2={x(g.t)} y1={PAD.top} y2={H - PAD.bottom} />
+      {#if g.label}
+        <text class="tick" x={x(g.t)} y={H - PAD.bottom + 18} text-anchor="middle">{g.t}°</text>
+      {/if}
     {/each}
 
     {#if minDuty > 0}
@@ -265,6 +309,18 @@
   .grid {
     stroke: var(--rule);
     stroke-width: 1;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .grid.major {
+    opacity: 1;
+  }
+
+  .squeezed {
+    fill: var(--ink-soft);
+    opacity: 0.06;
+    pointer-events: none;
   }
 
   .tick {
