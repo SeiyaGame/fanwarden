@@ -45,13 +45,6 @@ services:
     # Do not add `security_opt: no-new-privileges`: smartctl gets its capabilities from
     # file capabilities, which that option disables.
 
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9495/api/auth/status"]
-      interval: 30s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
-
     logging:
       driver: json-file
       options:

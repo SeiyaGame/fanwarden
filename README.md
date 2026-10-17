@@ -89,6 +89,7 @@ Limits:
 fan-control [--config FILE] [--dry-run] [--simulate] [--listen ADDR]
 fan-control set-password      # reset the web password (read from stdin)
 fan-control check-config      # validate the configuration
+fan-control healthcheck       # exit 0 if the service answers (used by the Docker image)
 ```
 
 - `--dry-run`: read and compute, never write to the BMC.

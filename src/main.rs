@@ -33,7 +33,7 @@ struct Cli {
     simulate: bool,
 
     /// Overrides `web.listen` from the configuration.
-    #[arg(long)]
+    #[arg(long, env = "FAN_CONTROL_LISTEN", global = true)]
     listen: Option<String>,
 
     #[command(subcommand)]
@@ -46,6 +46,8 @@ enum Command {
     SetPassword,
     /// Validates the configuration file and exits.
     CheckConfig,
+    /// Exits with 0 if the running service answers on its web port (Docker HEALTHCHECK).
+    Healthcheck,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -56,6 +58,13 @@ fn main() -> anyhow::Result<()> {
             Config::load_or_create(&cli.config)?;
             println!("{}: OK", cli.config.display());
             Ok(())
+        }
+        Some(Command::Healthcheck) => {
+            let listen = match &cli.listen {
+                Some(listen) => listen.clone(),
+                None => Config::load(&cli.config)?.web.listen,
+            };
+            web::health::check(web::health::probe_address(&listen)?, std::time::Duration::from_secs(5))
         }
         None => tokio::runtime::Runtime::new()?.block_on(run(cli)),
     }

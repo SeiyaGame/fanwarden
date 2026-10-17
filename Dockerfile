@@ -28,4 +28,5 @@ ENV FAN_CONTROL_CONFIG=/data/config.toml \
     RUN_AS_ROOT=true
 VOLUME /data
 EXPOSE 9495
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 CMD ["fan-control", "healthcheck"]
 ENTRYPOINT ["/entrypoint.sh"]
