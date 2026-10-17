@@ -3,7 +3,7 @@ name = "fan-control"
 version = "0.1.0"
 edition = "2024"
 description = "Fan control for Supermicro motherboards through IPMI, with a web UI"
-license = "MIT"
+license = "GPL-3.0-only"
 rust-version = "1.88"
 
 [dependencies]

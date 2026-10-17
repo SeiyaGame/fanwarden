@@ -1,0 +1,13 @@
+# Reading SMART data and talking to /dev/ipmi0 needs a privileged container.
+# For a remote BMC only (no disks), drop `privileged` and the devices.
+services:
+  fan-control:
+    build: .
+    container_name: fan-control
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ./data:/data
+      - /dev:/dev
+    ports:
+      - "9495:9495"
