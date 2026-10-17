@@ -59,8 +59,13 @@ pub async fn scan(config: &Disks) -> anyhow::Result<Vec<DiskInfo>> {
     let exclude = regex::Regex::new(&config.exclude)?;
     let args: Vec<String> = ["-J", "-d", "-o", "NAME,ROTA,TRAN,TYPE,MODEL,SERIAL"].map(String::from).to_vec();
     let out = exec::run_ok(&config.lsblk_path, &args, &[], Duration::from_secs(10)).await?;
-    let devices: Vec<BlockDevice> =
-        parse_lsblk(&out)?.into_iter().filter(|d| config.exclude.is_empty() || !exclude.is_match(&d.name)).collect();
+    let devices: Vec<BlockDevice> = parse_lsblk(&out)?
+        .into_iter()
+        .filter(|d| config.exclude.is_empty() || !exclude.is_match(&d.name))
+        // lsblk reads /sys and lists every disk of the host; in a container that only received
+        // some devices (`devices:` in compose), skip the ones without a /dev node.
+        .filter(|d| std::path::Path::new("/dev").join(&d.name).exists())
+        .collect();
 
     let reads = devices.into_iter().map(|device| async move {
         match smartctl(config, &device.name).await {

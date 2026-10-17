@@ -53,11 +53,56 @@ Images are published on `ghcr.io/seiyagame/fan_control_supermicro`: `latest` and
 | Variable | Default | |
 | -------- | ------- | - |
 | `PUID` / `PGID` | `1000` | Owner of the files in `/data` (config, history) |
-| `RUN_AS_ROOT` | `false` | fan-control runs as `PUID:PGID`; only `ipmitool` and `smartctl` run as root (through `doas`). `true` runs everything as root, for troubleshooting |
+| `RUN_AS_ROOT` | `true` | `false` enables the hardened mode below |
 | `TZ` | | Time zone of the logs |
 
-The container must be privileged to reach `/dev/ipmi0` and the disks. With a remote BMC and no disk
-monitoring, `privileged` and the `/dev` volume can be removed.
+By default the container runs as root, privileged, with the host `/dev`: the BMC and every disk are
+found without any setup. A privileged container is close to root on the host.
+
+#### Hardened mode
+
+fan-control runs as `PUID:PGID` in an unprivileged container that only receives the BMC, the disks
+and the capabilities SMART needs. The entrypoint gives `abc` access to the devices passed in
+`devices:` (the container's own copies: the host is not changed) and grants smartctl the capabilities
+allowed by `cap_add`.
+
+```yaml
+services:
+  fan-control:
+    image: ghcr.io/seiyagame/fan_control_supermicro:latest
+    container_name: fan-control
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - RUN_AS_ROOT=false
+    devices:
+      - /dev/ipmi0
+      # Every disk to monitor, under the same name as on the host (disks are listed with
+      # lsblk, which sees the host names: do not rename them here)
+      - /dev/sda
+      - /dev/sdb
+      - /dev/nvme0n1
+    cap_add:
+      - SYS_RAWIO    # SMART on SATA/SAS disks
+      - SYS_ADMIN    # only if NVMe drives are listed above
+    volumes:
+      - ./data:/data
+    ports:
+      - "9495:9495"
+    stop_grace_period: 30s
+```
+
+Limits:
+
+- A disk added to the server must be added to `devices:` (disks without a device in the container are
+  ignored).
+- NVMe SMART needs `SYS_ADMIN`, a broad capability. Without NVMe, leave it out.
+- Do not mount `/dev` as a volume in this mode: the entrypoint refuses to start rather than change the
+  permissions of the host devices.
+- With a remote BMC, `/dev/ipmi0` is not needed; without disk monitoring, neither are the disks and
+  `cap_add`.
 
 ## Command line
 
