@@ -5,9 +5,9 @@ services:
     container_name: fan-control
     restart: unless-stopped
 
-    # Root and privileged access are needed for /dev/ipmi0 and SMART on the disks.
-    # With a remote BMC and disk monitoring disabled: remove `privileged` and the /dev
-    # volume, and set RUN_AS_ROOT=false.
+    # The app runs as PUID/PGID; only ipmitool (/dev/ipmi0) and smartctl (SMART) run as
+    # root, which needs a privileged container with /dev. With a remote BMC and disk
+    # monitoring disabled, `privileged` and the /dev volume can be removed.
     privileged: true
 
     environment:
@@ -15,7 +15,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
-      - RUN_AS_ROOT=true
+      # true = run everything as root (troubleshooting only)
+      - RUN_AS_ROOT=false
       # More details in the logs: fan_control=debug
       - RUST_LOG=fan_control=info
 

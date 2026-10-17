@@ -53,11 +53,11 @@ Images are published on `ghcr.io/seiyagame/fan_control_supermicro`: `latest` and
 | Variable | Default | |
 | -------- | ------- | - |
 | `PUID` / `PGID` | `1000` | Owner of the files in `/data` (config, history) |
-| `RUN_AS_ROOT` | `true` | The process needs root for `/dev/ipmi0` and SMART; files still belong to `PUID:PGID`. Set `false` to run as `PUID:PGID`, only with a remote BMC and disk monitoring disabled |
+| `RUN_AS_ROOT` | `false` | fan-control runs as `PUID:PGID`; only `ipmitool` and `smartctl` run as root (through `doas`). `true` runs everything as root, for troubleshooting |
 | `TZ` | | Time zone of the logs |
 
 The container must be privileged to reach `/dev/ipmi0` and the disks. With a remote BMC and no disk
-monitoring, it can run unprivileged with `RUN_AS_ROOT=false`.
+monitoring, `privileged` and the `/dev` volume can be removed.
 
 ## Command line
 

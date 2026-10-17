@@ -4,7 +4,7 @@ set -e
 
 PUID=${PUID:-1000}
 PGID=${PGID:-1000}
-RUN_AS_ROOT=${RUN_AS_ROOT:-true}
+RUN_AS_ROOT=${RUN_AS_ROOT:-false}
 
 # Adjust abc user/group to match requested PUID/PGID
 if [ "$(id -g abc)" != "$PGID" ]; then
@@ -29,8 +29,9 @@ mkdir -p "$(dirname "$FAN_CONTROL_CONFIG")"
 chown -R abc:abc "$(dirname "$FAN_CONTROL_CONFIG")"
 
 if [ "$RUN_AS_ROOT" = "true" ]; then
-    # Needed for /dev/ipmi0 and SMART on the disks. Files keep the PUID/PGID owner.
+    # Everything as root (troubleshooting). Files keep the PUID/PGID owner.
     exec fan-control "$@"
 fi
-# Only works with a remote BMC and disk monitoring disabled.
+# fan-control runs as abc (PUID/PGID). ipmitool and smartctl are wrappers that run the real
+# tools as root through doas, the only commands abc is allowed to run that way.
 exec su-exec abc fan-control "$@"
