@@ -43,8 +43,12 @@ Init/Shutdown Scripts) so the service is recreated after a TrueNAS update.
 ### Docker
 
 ```bash
-docker compose up -d --build
+curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fan_control_supermicro/main/docker-compose.yml
+docker compose up -d
 ```
+
+Images are published on `ghcr.io/seiyagame/fan_control_supermicro`: `latest` and `X.Y.Z` for releases,
+`edge` for the main branch. To build the image yourself: `docker build -t fan-control .`
 
 | Variable | Default | |
 | -------- | ------- | - |

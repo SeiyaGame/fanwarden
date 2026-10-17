@@ -1,20 +1,43 @@
-# Reading SMART data and talking to /dev/ipmi0 needs a privileged container.
-# For a remote BMC only (no disks), drop `privileged` and the devices.
 services:
   fan-control:
-    build: .
+    # Pin a version (e.g. :1.2.0) to choose when to upgrade; :latest follows releases.
+    image: ghcr.io/seiyagame/fan_control_supermicro:latest
     container_name: fan-control
     restart: unless-stopped
+
+    # Root and privileged access are needed for /dev/ipmi0 and SMART on the disks.
+    # With a remote BMC and disk monitoring disabled: remove `privileged` and the /dev
+    # volume, and set RUN_AS_ROOT=false.
     privileged: true
+
     environment:
       # Owner of the files in ./data (run `id` on the host to find yours)
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
-      # false = run as PUID/PGID: only with a remote BMC and disk monitoring disabled
       - RUN_AS_ROOT=true
+      # More details in the logs: fan_control=debug
+      - RUST_LOG=fan_control=info
+
     volumes:
-      - ./data:/data
+      - ./data:/data # config.toml and history.db
       - /dev:/dev
+
     ports:
-      - "9495:9495"
+      - "9495:9495" # web UI and /metrics
+
+    # On stop the fans are handed back to the BMC: leave it time to send the command.
+    stop_grace_period: 30s
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9495/api/auth/status"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
