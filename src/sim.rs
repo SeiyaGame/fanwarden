@@ -12,11 +12,22 @@ pub struct Simulator {
     start: Instant,
     pub mode: FanMode,
     duties: HashMap<u8, u8>,
+    /// Hard drives warm up and cool down slowly toward a temperature set by the airflow.
+    hdd_temps: Vec<f32>,
+    last_step: Instant,
 }
+
+const HDD_SERIALS: [&str; 6] = ["ZCT3S9M0", "HLH01J2B", "2244E6812B23", "2244E6812A49", "ZR13LBZD", "ZCT3S7WH"];
+/// Seconds for a drive to cover ~63% of the way to its new temperature.
+const HDD_INERTIA_SECS: f32 = 180.0;
 
 impl Default for Simulator {
     fn default() -> Self {
-        Self { start: Instant::now(), mode: FanMode::Standard, duties: HashMap::new() }
+        let now = Instant::now();
+        let mut sim =
+            Self { start: now, mode: FanMode::Standard, duties: HashMap::new(), hdd_temps: Vec::new(), last_step: now };
+        sim.hdd_temps = (0..HDD_SERIALS.len()).map(|i| sim.hdd_equilibrium(i)).collect();
+        sim
     }
 }
 
@@ -65,11 +76,22 @@ impl Simulator {
         }
     }
 
-    pub fn sensors(&self) -> SensorData {
+    /// Temperature a drive settles at with the current airflow: ~1°C less per 5% of duty.
+    fn hdd_equilibrium(&self, i: usize) -> f32 {
+        let room = 1.5 * (self.t() / 900.0 + i as f32).sin();
+        43.0 + i as f32 * 0.6 + room - 0.2 * self.duty(1)
+    }
+
+    pub fn sensors(&mut self) -> SensorData {
         let t = self.t();
-        let periph = self.duty(1);
+        let dt = self.last_step.elapsed().as_secs_f32();
+        self.last_step = Instant::now();
+        for i in 0..self.hdd_temps.len() {
+            let target = self.hdd_equilibrium(i);
+            self.hdd_temps[i] += (target - self.hdd_temps[i]) * (dt / HDD_INERTIA_SECS).min(1.0);
+        }
         let hdd = |i: usize, serial: &str| {
-            let base = 33.0 + i as f32 * 0.8 + 4.0 * (t / 240.0 + i as f32).sin() - (periph - 50.0) * 0.06;
+            let base = self.hdd_temps[i];
             DiskInfo {
                 name: format!("sd{}", (b'a' + i as u8) as char),
                 serial: serial.into(),
@@ -80,11 +102,7 @@ impl Simulator {
                 error: None,
             }
         };
-        let mut disks: Vec<DiskInfo> = ["ZCT3S9M0", "HLH01J2B", "2244E6812B23", "2244E6812A49", "ZR13LBZD", "ZCT3S7WH"]
-            .iter()
-            .enumerate()
-            .map(|(i, s)| hdd(i, s))
-            .collect();
+        let mut disks: Vec<DiskInfo> = HDD_SERIALS.iter().enumerate().map(|(i, s)| hdd(i, s)).collect();
         disks.push(DiskInfo {
             name: "sdg".into(),
             serial: "S4EVNX0R".into(),

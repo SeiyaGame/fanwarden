@@ -74,6 +74,9 @@ max_duty = 100
 
 [[zones.rules]]
 source = "disks:hdd"
+# Lowest speed that keeps the hottest HDD at 38°C; the curve below is the safety net
+# (applied again from 42°C) and the starting point.
+target = { celsius = 38.0, reactivity = "normal" }
 curve = [
     # Keep the hottest HDD at or below ~40°C: published field studies (Google 2007,
     # Microsoft 2011/2013) see wear rise with heat, clearly so above ~45°C, while

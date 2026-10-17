@@ -32,6 +32,8 @@ export interface RuleStatus {
   temperature: number | null
   state: 'ok' | 'idle' | 'missing'
   duty: number
+  target: number | null
+  emergency: boolean
 }
 
 export interface ZoneStatus {
@@ -78,9 +80,17 @@ export interface Snapshot {
 
 export type CurvePoint = [number, number]
 
+export type Reactivity = 'calm' | 'normal' | 'reactive'
+
+export interface Target {
+  celsius: number
+  reactivity: Reactivity
+}
+
 export interface Rule {
   source: string
   curve: CurvePoint[]
+  target?: Target | null
 }
 
 export interface Zone {

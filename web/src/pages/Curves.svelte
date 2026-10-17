@@ -16,6 +16,21 @@
     return sources.find((s) => s.id === source)?.celsius ?? null
   }
 
+  /** Same split as the backend (src/regulator.rs): CPU sensors react fast, the rest slowly. */
+  function safetyMargin(source: string): number {
+    return probeForSource(source, diskKind) === 'cpu' ? 10 : 4
+  }
+
+  function defaultTarget(source: string): number {
+    const targets: Record<Probe, number> = { cpu: 65, hdd: 38, ssd: 45, nvme: 55, board: 45 }
+    return targets[probeForSource(source, diskKind)]
+  }
+
+  /** Duty the regulator chose for this rule in the last cycle. */
+  function liveDuty(zoneId: number, index: number): number | null {
+    return live.snapshot?.zones.find((z) => z.id === zoneId)?.rules[index]?.duty ?? null
+  }
+
   function addRule(zone: Zone) {
     const used = new Set(zone.rules.map((r) => r.source))
     const source = sources.find((s) => !used.has(s.id))?.id ?? 'cpu'
@@ -94,6 +109,43 @@
               </label>
               <button class="quiet" onclick={() => zone.rules.splice(ri, 1)}>Remove source</button>
             </div>
+            <div class="mode" role="group" aria-label="How this source drives the fans">
+              <button
+                class:quiet={!!rule.target}
+                aria-pressed={!rule.target}
+                onclick={() => (rule.target = null)}>Follow the curve</button
+              >
+              <button
+                class:quiet={!rule.target}
+                aria-pressed={!!rule.target}
+                onclick={() =>
+                  (rule.target = rule.target ?? {
+                    celsius: defaultTarget(rule.source),
+                    reactivity: 'normal',
+                  })}>Hold a temperature</button
+              >
+            </div>
+            {#if rule.target}
+              <div class="target-fields">
+                <label class="field"
+                  >Target (°C)
+                  <input type="number" min="10" max="100" step="1" bind:value={rule.target.celsius} /></label
+                >
+                <label class="field"
+                  >Reactivity
+                  <select bind:value={rule.target.reactivity}>
+                    <option value="calm">Calm: slow, quiet changes</option>
+                    <option value="normal">Normal</option>
+                    <option value="reactive">Reactive: follows quickly</option>
+                  </select>
+                </label>
+                <p class="soft">
+                  Fans run at the lowest speed that keeps this source at {rule.target.celsius}°C. The curve is
+                  the starting point and the safety net: from {rule.target.celsius +
+                    safetyMargin(rule.source)}°C it applies again.
+                </p>
+              </div>
+            {/if}
             <CurveEditor
               bind:points={rule.curve}
               probe={probeForSource(rule.source, diskKind)}
@@ -101,6 +153,9 @@
               minDuty={zone.min_duty}
               maxDuty={zone.max_duty}
               label={zone.name}
+              target={rule.target?.celsius ?? null}
+              safetyFrom={rule.target ? rule.target.celsius + safetyMargin(rule.source) : null}
+              actualDuty={liveDuty(zone.id, ri)}
             />
           </div>
         {:else}
@@ -148,6 +203,28 @@
     gap: 0.8rem;
     border-top: 1px solid var(--rule);
     padding-top: 1.1rem;
+  }
+
+  .mode {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .target-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.8rem 1.2rem;
+  }
+
+  .target-fields .field {
+    width: 12rem;
+  }
+
+  .target-fields p {
+    flex: 1 1 20rem;
+    font-size: var(--step--1);
   }
 
   .rule-head .field {

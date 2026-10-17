@@ -11,6 +11,9 @@
     minDuty = 0,
     maxDuty = 100,
     label,
+    target = null,
+    safetyFrom = null,
+    actualDuty = null,
   }: {
     points: CurvePoint[]
     probe: Probe
@@ -18,7 +21,15 @@
     minDuty?: number
     maxDuty?: number
     label: string
+    /** Target mode: temperature held by the regulator. */
+    target?: number | null
+    /** Target mode: temperature from which the curve is enforced. */
+    safetyFrom?: number | null
+    /** Target mode: duty chosen by the regulator right now. */
+    actualDuty?: number | null
   } = $props()
+
+  const clipId = `safety-${Math.random().toString(36).slice(2, 9)}`
 
   /** Range where precision matters, per kind of sensor: it gets most of the width. */
   const USEFUL: Record<Probe, [number, number]> = {
@@ -91,9 +102,10 @@
     return coords.map(([t, d], i) => `${i ? 'L' : 'M'}${x(t).toFixed(1)},${y(d).toFixed(1)}`).join(' ')
   })
 
-  const currentDuty = $derived(
+  const curveDuty = $derived(
     current === null ? null : Math.min(maxDuty, Math.max(minDuty, dutyAt(points, current))),
   )
+  const currentDuty = $derived(target !== null && actualDuty !== null ? actualDuty : curveDuty)
   const problems = $derived(curveProblems(points))
 
   let svg: SVGSVGElement
@@ -224,7 +236,24 @@
       />
     {/if}
 
-    <path class="curve" d={path} />
+    {#if target !== null && safetyFrom !== null}
+      <!-- Target mode: the curve only applies from the safety threshold, the rest is faded. -->
+      <clipPath id={clipId}>
+        <rect x={x(safetyFrom)} y="0" width={W} height={H} />
+      </clipPath>
+      <path class="curve faded" d={path} />
+      <path class="curve" d={path} clip-path="url(#{clipId})" />
+      <line class="safety" x1={x(safetyFrom)} x2={x(safetyFrom)} y1={PAD.top} y2={H - PAD.bottom} />
+      <text class="safety-label" x={x(safetyFrom) + 6} y={H - PAD.bottom - 8}
+        >Safety curve from {safetyFrom}°</text
+      >
+      <line class="target" x1={x(target)} x2={x(target)} y1={PAD.top} y2={H - PAD.bottom} />
+      <text class="target-label" x={x(target) - 6} y={H - PAD.bottom - 8} text-anchor="end"
+        >Target {target}°</text
+      >
+    {:else}
+      <path class="curve" d={path} />
+    {/if}
 
     {#if current !== null && currentDuty !== null}
       <line class="now" x1={x(current)} x2={x(current)} y1={PAD.top} y2={H - PAD.bottom} />
@@ -341,6 +370,39 @@
     stroke-width: 2.5;
     stroke-linejoin: round;
     pointer-events: none;
+  }
+
+  .curve.faded {
+    opacity: 0.25;
+    stroke-dasharray: 6 5;
+  }
+
+  .target {
+    stroke: var(--mild);
+    stroke-width: 3;
+    pointer-events: none;
+  }
+
+  .target-label,
+  .safety-label {
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+  }
+
+  .target-label {
+    fill: var(--mild);
+  }
+
+  .safety {
+    stroke: var(--hot);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+  }
+
+  .safety-label {
+    fill: var(--hot);
   }
 
   .now {

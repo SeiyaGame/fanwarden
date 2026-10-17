@@ -48,19 +48,34 @@ pub struct Gains {
     pub max_down: f32,
     /// °C above the target from which the curve is enforced as a minimum.
     pub emergency_margin: f32,
+    /// Time constant of the smoothing applied to readings, in seconds: whole-degree steps
+    /// would otherwise kick the proportional term at every change.
+    pub smoothing_secs: f32,
 }
 
 impl Gains {
     pub fn new(inertia: Inertia, reactivity: Reactivity) -> Self {
         let base = match inertia {
             // Integer temperatures, minutes of thermal inertia: small, patient corrections.
-            Inertia::Slow => {
-                Gains { kp: 4.0, ki: 0.02, deadband: 0.5, max_up: 4.0, max_down: 1.0, emergency_margin: 4.0 }
-            }
+            Inertia::Slow => Gains {
+                kp: 4.0,
+                ki: 0.02,
+                deadband: 0.5,
+                max_up: 4.0,
+                max_down: 1.0,
+                emergency_margin: 4.0,
+                smoothing_secs: 60.0,
+            },
             // Noisy, fast readings: wider deadband, larger steps.
-            Inertia::Fast => {
-                Gains { kp: 2.0, ki: 0.08, deadband: 1.5, max_up: 10.0, max_down: 3.0, emergency_margin: 10.0 }
-            }
+            Inertia::Fast => Gains {
+                kp: 2.0,
+                ki: 0.08,
+                deadband: 1.5,
+                max_up: 10.0,
+                max_down: 3.0,
+                emergency_margin: 10.0,
+                smoothing_secs: 10.0,
+            },
         };
         let factor = match reactivity {
             Reactivity::Calm => 0.5,
@@ -83,6 +98,8 @@ pub struct Regulator {
     /// Fractional duty, so that corrections below 1% accumulate.
     duty: Option<f32>,
     last_error: f32,
+    /// Smoothed temperature.
+    filtered: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,7 +123,10 @@ impl Regulator {
         min_duty: f32,
         max_duty: f32,
     ) -> Output {
-        let error = temp - target;
+        let alpha = dt / (gains.smoothing_secs + dt);
+        let filtered = self.filtered.map_or(temp, |f| f + alpha * (temp - f));
+        self.filtered = Some(filtered);
+        let error = filtered - target;
         let effective = if error.abs() <= gains.deadband { 0.0 } else { error };
         let mut duty = match self.duty {
             None => curve_duty,
@@ -117,7 +137,7 @@ impl Regulator {
             }
         };
         self.last_error = effective;
-        let emergency = error >= gains.emergency_margin;
+        let emergency = temp - target >= gains.emergency_margin;
         if emergency {
             duty = duty.max(curve_duty);
         }
@@ -187,7 +207,7 @@ mod tests {
         let settled = *duties.last().unwrap();
         assert!((30..=45).contains(&settled), "settled at {settled}%");
         let (lo, hi) = duties[last_hour..].iter().fold((100, 0), |(lo, hi), &d| (lo.min(d), hi.max(d)));
-        assert!(hi - lo <= 6, "fans keep changing in steady state: {lo}..{hi}%");
+        assert!(hi - lo <= 3, "fans keep changing in steady state: {lo}..{hi}%");
     }
 
     #[test]

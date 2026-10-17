@@ -61,7 +61,14 @@
             style:background={thermalColor(rule.temperature, probeForSource(rule.source))}
             aria-hidden="true"
           ></span>
-          <span class="label">{sourceLabel(rule.source)}</span>
+          <span class="label"
+            >{sourceLabel(rule.source)}
+            {#if rule.target !== null}
+              <small class:over={rule.emergency}
+                >{rule.emergency ? 'far above target' : 'target'} {rule.target}°</small
+              >
+            {/if}
+          </span>
           <span class="figure">
             {#if rule.state === 'ok'}{rule.temperature}°C
             {:else if rule.state === 'idle'}<span class="soft">asleep</span>
@@ -192,6 +199,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .label small {
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin-left: 0.3rem;
+  }
+
+  .label small.over {
+    color: var(--critical);
+    font-weight: 600;
   }
 
   .missing {
