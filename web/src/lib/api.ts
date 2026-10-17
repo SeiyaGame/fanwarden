@@ -50,6 +50,7 @@ export const api = {
   status: () => request<Snapshot>('GET', '/status'),
   config: () => request<Config>('GET', '/config'),
   saveConfig: (config: Config) => request<Config>('PUT', '/config', config),
+  reloadConfig: () => request<Config>('POST', '/config/reload'),
   setManual: (zone: number, duty: number | null) => request('PUT', `/zones/${zone}/manual`, { duty }),
   events: (after = 0) => request<LogEvent[]>('GET', `/events?after=${after}`),
   history: (range: number, prefix: string, points = 600) =>

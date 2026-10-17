@@ -181,6 +181,19 @@ pub async fn put_config(State(state): State<Arc<AppState>>, Json(incoming): Json
     Ok(Json(state.config().redacted()).into_response())
 }
 
+pub async fn reload_config(State(state): State<Arc<AppState>>) -> ApiResult {
+    let listen = state.config().web.listen;
+    let config = state.reload_config().map_err(|e| {
+        tracing::warn!("configuration file not reloaded: {e:#}");
+        bad_request(format!("{e:#}"))
+    })?;
+    if config.web.listen != listen {
+        tracing::info!("web listen address changed to {}: restart the service to apply", config.web.listen);
+    }
+    tracing::info!("configuration reloaded from {}", state.config_path.display());
+    Ok(Json(config.redacted()).into_response())
+}
+
 // ---- Manual control ------------------------------------------------------------------------
 
 #[derive(Deserialize)]

@@ -137,6 +137,34 @@ async fn invalid_config_is_rejected() {
 }
 
 #[tokio::test]
+async fn reload_config_from_file() {
+    let mut app = logged_in(Config::default()).await;
+    let path = app.state.config_path.clone();
+
+    // Edited by hand: applied on reload, the password hash written by setup is kept.
+    let text = std::fs::read_to_string(&path).unwrap().replace("interval_secs = 10", "interval_secs = 42");
+    std::fs::write(&path, text).unwrap();
+    let (status, body, _) = app.call("POST", "/api/config/reload", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["general"]["interval_secs"], 42);
+    assert_eq!(app.state.config().general.interval_secs, 42);
+    assert!(app.state.config().web.password_hash.starts_with("$argon2"));
+
+    // Broken file: error, running configuration untouched.
+    std::fs::write(
+        &path,
+        "[general]
+interval_secs = \"oops\"
+",
+    )
+    .unwrap();
+    let (status, body, _) = app.call("POST", "/api/config/reload", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("invalid configuration"));
+    assert_eq!(app.state.config().general.interval_secs, 42);
+}
+
+#[tokio::test]
 async fn manual_duty() {
     let mut app = logged_in(Config::default()).await;
     let (status, _, _) = app.call("PUT", "/api/zones/1/manual", Some(json!({ "duty": 80 }))).await;

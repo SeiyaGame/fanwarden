@@ -341,6 +341,11 @@ impl Config {
             tracing::info!("created default configuration at {}", path.display());
             return Ok(config);
         }
+        Self::load(path)
+    }
+
+    /// Loads and validates an existing configuration file.
+    pub fn load(path: &Path) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
         let config: Config =
             toml::from_str(&text).with_context(|| format!("invalid configuration {}", path.display()))?;

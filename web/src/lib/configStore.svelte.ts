@@ -36,6 +36,14 @@ class ConfigStore {
     }
   }
 
+  /** Re-reads config.toml on the server (after a manual edit). Unsaved changes are dropped. */
+  async reload() {
+    const config = await api.reloadConfig()
+    this.saved = config
+    this.draft = structuredClone(config)
+    this.error = null
+  }
+
   discard() {
     if (this.saved) this.draft = structuredClone($state.snapshot(this.saved) as Config)
     this.error = null

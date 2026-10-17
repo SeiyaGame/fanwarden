@@ -8,6 +8,24 @@
   let next = $state('')
   let confirm = $state('')
   let passwordMessage = $state<{ ok: boolean; text: string } | null>(null)
+  let reloadMessage = $state<{ ok: boolean; text: string } | null>(null)
+  let reloading = $state(false)
+
+  async function reload() {
+    reloading = true
+    reloadMessage = null
+    try {
+      await configStore.reload()
+      reloadMessage = { ok: true, text: `Configuration file reloaded at ${new Date().toLocaleTimeString()}.` }
+    } catch (e) {
+      reloadMessage = {
+        ok: false,
+        text: `Not reloaded, the running configuration is unchanged. ${e instanceof Error ? e.message : e}`,
+      }
+    } finally {
+      reloading = false
+    }
+  }
 
   async function changePassword(event: SubmitEvent) {
     event.preventDefault()
@@ -26,7 +44,18 @@
 </script>
 
 <div class="page">
-  <h1>Settings</h1>
+  <header class="head">
+    <h1>Settings</h1>
+    <div class="reload">
+      <button class="quiet" onclick={reload} disabled={reloading}>
+        {configStore.dirty ? 'Discard my changes and reload the file' : 'Reload the configuration file'}
+      </button>
+      <p class="soft">Applies changes made by hand in config.toml, without restarting.</p>
+    </div>
+  </header>
+  {#if reloadMessage}
+    <p class:error={!reloadMessage.ok} role="status">{reloadMessage.text}</p>
+  {/if}
 
   {#if config}
     <section class="panel" aria-labelledby="control-title">
@@ -207,6 +236,21 @@
   .page {
     display: grid;
     gap: var(--gutter);
+  }
+
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .reload {
+    display: grid;
+    justify-items: end;
+    gap: 0.3rem;
+    font-size: var(--step--1);
   }
 
   section.panel {

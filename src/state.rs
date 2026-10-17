@@ -125,6 +125,15 @@ impl AppState {
         Ok(())
     }
 
+    /// Re-reads the configuration file (edited by hand) and applies it.
+    /// On error the running configuration is kept.
+    pub fn reload_config(&self) -> anyhow::Result<Config> {
+        let config = Config::load(&self.config_path)?;
+        *self.config.write().unwrap() = config.clone();
+        self.wake.notify_one();
+        Ok(config)
+    }
+
     pub fn snapshot(&self) -> Arc<Snapshot> {
         self.snapshot.read().unwrap().clone()
     }

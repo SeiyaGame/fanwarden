@@ -28,6 +28,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/live", get(api::live))
         .route("/events", get(api::events))
         .route("/config", get(api::get_config).put(api::put_config))
+        .route("/config/reload", post(api::reload_config))
         .route("/zones/{id}/manual", put(api::set_manual))
         .route("/history", get(api::history))
         .route("/notifications/test", post(api::test_notification))
