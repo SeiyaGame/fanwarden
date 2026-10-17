@@ -6,6 +6,13 @@ services:
     container_name: fan-control
     restart: unless-stopped
     privileged: true
+    environment:
+      # Owner of the files in ./data (run `id` on the host to find yours)
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      # false = run as PUID/PGID: only with a remote BMC and disk monitoring disabled
+      - RUN_AS_ROOT=true
     volumes:
       - ./data:/data
       - /dev:/dev

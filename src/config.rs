@@ -354,6 +354,7 @@ impl Config {
     }
 
     /// Writes atomically (temp file + rename) with owner-only permissions: the file holds secrets.
+    /// The owner of an existing file is kept (e.g. PUID/PGID in Docker while running as root).
     pub fn save(&self, path: &Path) -> anyhow::Result<()> {
         let text = toml::to_string_pretty(self)?;
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
@@ -365,6 +366,11 @@ impl Config {
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+            if let Ok(meta) = std::fs::metadata(path) {
+                use std::os::unix::fs::MetadataExt;
+                // Best effort: only root can give the file to another user.
+                let _ = std::os::unix::fs::chown(&tmp, Some(meta.uid()), Some(meta.gid()));
+            }
         }
         std::fs::rename(&tmp, path)?;
         Ok(())

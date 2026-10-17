@@ -17,9 +17,10 @@ RUN cargo build --release --locked
 
 # Runtime: the tools fan-control calls
 FROM alpine:3.22
-RUN apk add --no-cache ipmitool smartmontools lsblk tzdata
+RUN apk add --no-cache ipmitool smartmontools lsblk tzdata shadow su-exec     && addgroup -g 1000 abc     && adduser -D -H -u 1000 -G abc abc
 COPY --from=build /src/target/release/fan-control /usr/local/bin/fan-control
-ENV FAN_CONTROL_CONFIG=/data/config.toml
+COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
+ENV FAN_CONTROL_CONFIG=/data/config.toml     PUID=1000     PGID=1000     RUN_AS_ROOT=true
 VOLUME /data
 EXPOSE 9495
-ENTRYPOINT ["fan-control"]
+ENTRYPOINT ["/entrypoint.sh"]

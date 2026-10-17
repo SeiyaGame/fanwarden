@@ -33,7 +33,9 @@ sudo bash install.sh --dir /mnt/tank/apps/fan-control
 ```
 
 Then open `http://<server>:9495` and choose the web password. The configuration is in `config.toml`
-next to the binary; everything can be changed from the UI.
+next to the binary; everything can be changed from the UI. `config.example.toml` is a complete example
+(curves tuned to keep hard drives at or below ~40°C). After editing the file by hand, use *Reload the
+configuration file* in Settings: no restart needed.
 
 On TrueNAS, add the command printed by the installer as a *Post Init* script (System › Advanced ›
 Init/Shutdown Scripts) so the service is recreated after a TrueNAS update.
@@ -44,8 +46,14 @@ Init/Shutdown Scripts) so the service is recreated after a TrueNAS update.
 docker compose up -d --build
 ```
 
+| Variable | Default | |
+| -------- | ------- | - |
+| `PUID` / `PGID` | `1000` | Owner of the files in `/data` (config, history) |
+| `RUN_AS_ROOT` | `true` | The process needs root for `/dev/ipmi0` and SMART; files still belong to `PUID:PGID`. Set `false` to run as `PUID:PGID`, only with a remote BMC and disk monitoring disabled |
+| `TZ` | | Time zone of the logs |
+
 The container must be privileged to reach `/dev/ipmi0` and the disks. With a remote BMC and no disk
-monitoring, it can run unprivileged.
+monitoring, it can run unprivileged with `RUN_AS_ROOT=false`.
 
 ## Command line
 
