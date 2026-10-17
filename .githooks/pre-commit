@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Enabled with: git config core.hooksPath .githooks
+# Only checks the parts touched by the commit. Bypass in an emergency with --no-verify.
+set -euo pipefail
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -z "$staged" ] && exit 0
+
+if echo "$staged" | grep -qE '^web/'; then
+  scripts/check.sh web
+fi
+if echo "$staged" | grep -qE '^(src/|tests/|build\.rs|Cargo\.(toml|lock)|rustfmt\.toml)'; then
+  scripts/check.sh rust
+fi

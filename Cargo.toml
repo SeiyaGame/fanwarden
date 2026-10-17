@@ -2,6 +2,9 @@
 name = "fan-control"
 version = "0.1.0"
 edition = "2024"
+description = "Fan control for Supermicro motherboards through IPMI, with a web UI"
+license = "MIT"
+rust-version = "1.88"
 
 [dependencies]
 anyhow = "1.0.104"
@@ -28,3 +31,15 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 http-body-util = "0.1.5"
 tempfile = "3.27.0"
 tower = { version = "0.5.3", features = ["util"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
