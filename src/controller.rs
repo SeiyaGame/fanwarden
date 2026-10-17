@@ -9,7 +9,7 @@ use tokio::sync::watch;
 
 use crate::alerts::{AlertManager, Inputs};
 use crate::bmc::Bmc;
-use crate::config::{Config, FanMode, Ipmi, Zone};
+use crate::config::{Config, FanMode, Ipmi, Regulation, Zone};
 use crate::curve::next_duty;
 use crate::ipmi::{IpmiTool, SdrReadings};
 use crate::regulator::{Gains, Inertia, Regulator};
@@ -38,6 +38,7 @@ pub fn compute_zone(
     failsafe_duty: u8,
     memory: &mut Vec<RuleMemory>,
     dt: f32,
+    regulation: &Regulation,
 ) -> ZoneStatus {
     if memory.len() != zone.rules.len() {
         *memory = vec![RuleMemory::default(); zone.rules.len()];
@@ -50,7 +51,11 @@ pub fn compute_zone(
         let mut emergency = false;
         let (temperature, state, duty) = match (reading, rule.target, source.as_ref()) {
             (Reading::Temp(t), Some(target), Ok(source)) => {
-                let gains = Gains::new(Inertia::of(source), target.reactivity);
+                let inertia = Inertia::of(source);
+                let gains = Gains {
+                    emergency_margin: regulation.safety_margin(inertia),
+                    ..Gains::new(inertia, target.reactivity)
+                };
                 let out = memory.regulator.update(
                     t,
                     target.celsius,
@@ -217,8 +222,15 @@ impl Controller {
         let mut zones = Vec::with_capacity(config.zones.len());
         for zone in &config.zones {
             let memory = self.memory.entry(zone.id).or_default();
-            let status =
-                compute_zone(zone, &data, manual.get(&zone.id).copied(), config.general.failsafe_duty, memory, dt);
+            let status = compute_zone(
+                zone,
+                &data,
+                manual.get(&zone.id).copied(),
+                config.general.failsafe_duty,
+                memory,
+                dt,
+                &config.regulation,
+            );
             if let Some(duty) = status.duty {
                 self.apply(config, &status, duty, dry_run).await;
             }
@@ -481,22 +493,44 @@ mod tests {
     fn highest_rule_wins_and_limits_apply() {
         let z = zone(vec![rule("cpu"), rule("disks:hdd")]);
         let mut memory = Vec::new();
-        let status =
-            compute_zone(&z, &data(Some(40.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory, 10.0);
+        let status = compute_zone(
+            &z,
+            &data(Some(40.0), Some((DiskState::Active, Some(35.0)))),
+            None,
+            100,
+            &mut memory,
+            10.0,
+            &Regulation::default(),
+        );
         assert_eq!(status.mode, ZoneMode::Auto);
         assert_eq!(status.duty, Some(65));
         assert_eq!(status.driver.as_deref(), Some("cpu"));
 
         // max_duty caps the curve.
-        let status =
-            compute_zone(&z, &data(Some(60.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory, 10.0);
+        let status = compute_zone(
+            &z,
+            &data(Some(60.0), Some((DiskState::Active, Some(35.0)))),
+            None,
+            100,
+            &mut memory,
+            10.0,
+            &Regulation::default(),
+        );
         assert_eq!(status.duty, Some(90));
     }
 
     #[test]
     fn sleeping_disks_use_min_duty() {
         let z = zone(vec![rule("disks:hdd")]);
-        let status = compute_zone(&z, &data(None, Some((DiskState::Standby, None))), None, 100, &mut Vec::new(), 10.0);
+        let status = compute_zone(
+            &z,
+            &data(None, Some((DiskState::Standby, None))),
+            None,
+            100,
+            &mut Vec::new(),
+            10.0,
+            &Regulation::default(),
+        );
         assert_eq!(status.mode, ZoneMode::Auto);
         assert_eq!(status.duty, Some(25));
         assert_eq!(status.rules[0].state, "idle");
@@ -505,7 +539,7 @@ mod tests {
     #[test]
     fn missing_source_triggers_failsafe_above_max() {
         let z = zone(vec![rule("cpu")]);
-        let status = compute_zone(&z, &data(None, None), None, 100, &mut Vec::new(), 10.0);
+        let status = compute_zone(&z, &data(None, None), None, 100, &mut Vec::new(), 10.0, &Regulation::default());
         assert_eq!(status.mode, ZoneMode::Failsafe);
         assert_eq!(status.duty, Some(100));
     }
@@ -519,30 +553,55 @@ mod tests {
         let mut memory = Vec::new();
 
         // First cycle starts from the curve: 36°C → 51%.
-        let first = compute_zone(&z, &cool, None, 100, &mut memory, 10.0);
+        let first = compute_zone(&z, &cool, None, 100, &mut memory, 10.0, &Regulation::default());
         assert_eq!(first.duty, Some(51));
         assert_eq!(first.rules[0].target, Some(38.0));
 
         // 2°C under the target for 5 minutes: the speed goes down, never below min_duty.
         let mut duty = 51;
         for _ in 0..30 {
-            duty = compute_zone(&z, &cool, None, 100, &mut memory, 10.0).duty.unwrap();
+            duty = compute_zone(&z, &cool, None, 100, &mut memory, 10.0, &Regulation::default()).duty.unwrap();
         }
         assert!((25..=45).contains(&duty), "duty {duty}");
 
         // Disks asleep: the regulator restarts from the curve next time.
-        compute_zone(&z, &data(None, Some((DiskState::Standby, None))), None, 100, &mut memory, 10.0);
-        assert_eq!(compute_zone(&z, &cool, None, 100, &mut memory, 10.0).duty, Some(51));
+        compute_zone(
+            &z,
+            &data(None, Some((DiskState::Standby, None))),
+            None,
+            100,
+            &mut memory,
+            10.0,
+            &Regulation::default(),
+        );
+        assert_eq!(compute_zone(&z, &cool, None, 100, &mut memory, 10.0, &Regulation::default()).duty, Some(51));
+    }
+
+    #[test]
+    fn safety_margin_comes_from_the_settings() {
+        let mut target_rule = rule("disks:hdd");
+        target_rule.target = Some(Target { celsius: 38.0, reactivity: Reactivity::Normal });
+        let z = zone(vec![target_rule]);
+        // 41°C: 3°C over the target.
+        let warm = data(None, Some((DiskState::Active, Some(41.0))));
+
+        let status = compute_zone(&z, &warm, None, 100, &mut Vec::new(), 10.0, &Regulation::default());
+        assert!(!status.rules[0].emergency, "default margin is 4°C");
+
+        let tight = Regulation { safety_margin_disks: 2.0, ..Regulation::default() };
+        let status = compute_zone(&z, &warm, None, 100, &mut Vec::new(), 10.0, &tight);
+        assert!(status.rules[0].emergency, "3°C over a 2°C margin enforces the curve");
     }
 
     #[test]
     fn manual_and_unmanaged() {
         let z = zone(vec![rule("cpu")]);
-        let status = compute_zone(&z, &data(None, None), Some(42), 100, &mut Vec::new(), 10.0);
+        let status = compute_zone(&z, &data(None, None), Some(42), 100, &mut Vec::new(), 10.0, &Regulation::default());
         assert_eq!((status.mode, status.duty), (ZoneMode::Manual, Some(42)));
 
         let empty = zone(vec![]);
-        let status = compute_zone(&empty, &data(Some(40.0), None), None, 100, &mut Vec::new(), 10.0);
+        let status =
+            compute_zone(&empty, &data(Some(40.0), None), None, 100, &mut Vec::new(), 10.0, &Regulation::default());
         assert_eq!((status.mode, status.duty), (ZoneMode::Unmanaged, None));
     }
 }

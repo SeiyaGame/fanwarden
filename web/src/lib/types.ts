@@ -135,6 +135,7 @@ export interface Config {
   }
   web: { listen: string; password_hash: string; session_hours: number; metrics_enabled: boolean }
   history: { enabled: boolean; retention_days: number }
+  regulation: { safety_margin_disks: number; safety_margin_cpu: number }
   alerts: {
     cpu_high: number | null
     disk_high: number | null

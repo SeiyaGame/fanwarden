@@ -96,6 +96,36 @@
       </div>
     </section>
 
+    <section class="panel" aria-labelledby="regulation-title">
+      <h2 id="regulation-title">Target temperature mode</h2>
+      <p class="soft">
+        A source set to hold a temperature follows its curve again when it runs this far above its target,
+        without waiting for the regulation.
+      </p>
+      <div class="grid-fields">
+        <label class="field"
+          >Safety net for disks and other sensors (°C above target)
+          <input
+            type="number"
+            min="1"
+            max="30"
+            step="0.5"
+            bind:value={config.regulation.safety_margin_disks}
+          /></label
+        >
+        <label class="field"
+          >Safety net for the CPU (°C above target)
+          <input
+            type="number"
+            min="1"
+            max="30"
+            step="0.5"
+            bind:value={config.regulation.safety_margin_cpu}
+          /></label
+        >
+      </div>
+    </section>
+
     <section class="panel" aria-labelledby="ipmi-title">
       <h2 id="ipmi-title">BMC connection</h2>
       <div class="grid-fields">

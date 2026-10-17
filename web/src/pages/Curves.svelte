@@ -16,9 +16,13 @@
     return sources.find((s) => s.id === source)?.celsius ?? null
   }
 
-  /** Same split as the backend (src/regulator.rs): CPU sensors react fast, the rest slowly. */
+  /** Same split as the backend (src/regulator.rs): CPU sensors are fast, the rest slow. */
   function safetyMargin(source: string): number {
-    return probeForSource(source, diskKind) === 'cpu' ? 10 : 4
+    const regulation = configStore.draft?.regulation
+    if (!regulation) return 4
+    return probeForSource(source, diskKind) === 'cpu'
+      ? regulation.safety_margin_cpu
+      : regulation.safety_margin_disks
   }
 
   function defaultTarget(source: string): number {

@@ -6,7 +6,7 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::curve::Curve;
-use crate::regulator::Reactivity;
+use crate::regulator::{Inertia, Reactivity};
 
 /// Placeholder returned by the API instead of secrets. Sending it back keeps the stored value.
 pub const SECRET_PLACEHOLDER: &str = "__unchanged__";
@@ -20,6 +20,7 @@ pub struct Config {
     pub web: Web,
     pub history: History,
     pub alerts: Alerts,
+    pub regulation: Regulation,
     pub notifications: Vec<NotificationChannel>,
     pub zones: Vec<Zone>,
 }
@@ -280,6 +281,32 @@ impl Default for History {
     }
 }
 
+/// Settings of the target temperature mode.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct Regulation {
+    /// °C above the target from which the curve is enforced again, for disks and other slow
+    /// sensors...
+    pub safety_margin_disks: f32,
+    /// ...and for CPU sensors, which move faster and further.
+    pub safety_margin_cpu: f32,
+}
+
+impl Default for Regulation {
+    fn default() -> Self {
+        Self { safety_margin_disks: 4.0, safety_margin_cpu: 10.0 }
+    }
+}
+
+impl Regulation {
+    pub fn safety_margin(&self, inertia: Inertia) -> f32 {
+        match inertia {
+            Inertia::Slow => self.safety_margin_disks,
+            Inertia::Fast => self.safety_margin_cpu,
+        }
+    }
+}
+
 impl Default for Alerts {
     fn default() -> Self {
         Self {
@@ -310,6 +337,7 @@ impl Default for Config {
             web: Web::default(),
             history: History::default(),
             alerts: Alerts::default(),
+            regulation: Regulation::default(),
             notifications: Vec::new(),
             zones: vec![
                 Zone {
@@ -394,6 +422,14 @@ impl Config {
     pub fn validate(&self) -> anyhow::Result<()> {
         if self.general.interval_secs < 2 {
             bail!("general.interval_secs must be at least 2");
+        }
+        for (name, margin) in [
+            ("regulation.safety_margin_disks", self.regulation.safety_margin_disks),
+            ("regulation.safety_margin_cpu", self.regulation.safety_margin_cpu),
+        ] {
+            if !(1.0..=30.0).contains(&margin) {
+                bail!("{name} must be between 1 and 30°C");
+            }
         }
         if self.general.failsafe_duty > 100 {
             bail!("general.failsafe_duty must be between 0 and 100");
