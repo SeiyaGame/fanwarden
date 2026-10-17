@@ -36,6 +36,10 @@ pub struct RuleStatus {
     /// `ok`, `idle` (disks asleep) or `missing`.
     pub state: &'static str,
     pub duty: u8,
+    /// Target temperature when the rule is in target mode.
+    pub target: Option<f32>,
+    /// Target mode only: far above the target, the curve is enforced.
+    pub emergency: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

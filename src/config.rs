@@ -6,6 +6,7 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::curve::Curve;
+use crate::regulator::Reactivity;
 
 /// Placeholder returned by the API instead of secrets. Sending it back keeps the stored value.
 pub const SECRET_PLACEHOLDER: &str = "__unchanged__";
@@ -213,7 +214,19 @@ pub struct Zone {
 pub struct Rule {
     /// Temperature source, see [`crate::sensors::Source`].
     pub source: String,
+    /// Speed by temperature. In target mode it is the starting point and the safety net.
     pub curve: Curve,
+    /// Target mode: find the lowest speed that holds this temperature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<Target>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Target {
+    pub celsius: f32,
+    #[serde(default)]
+    pub reactivity: Reactivity,
 }
 
 impl Default for General {
@@ -304,6 +317,7 @@ impl Default for Config {
                     name: "CPU".into(),
                     hysteresis: 3.0,
                     rules: vec![Rule {
+                        target: None,
                         source: "cpu".into(),
                         curve: Curve::new(vec![(30.0, 30), (45.0, 45), (60.0, 60), (75.0, 85), (85.0, 100)]),
                     }],
@@ -315,6 +329,7 @@ impl Default for Config {
                     hysteresis: 1.0,
                     min_duty: 30,
                     rules: vec![Rule {
+                        target: None,
                         source: "disks:hdd".into(),
                         curve: Curve::new(vec![
                             (30.0, 40),
@@ -412,6 +427,11 @@ impl Config {
             for rule in &zone.rules {
                 crate::sensors::Source::parse(&rule.source).with_context(|| format!("{name}: invalid source"))?;
                 rule.curve.validate().with_context(|| format!("{name}: invalid curve for '{}'", rule.source))?;
+                if let Some(target) = rule.target
+                    && !(10.0..=100.0).contains(&target.celsius)
+                {
+                    bail!("{name}: target temperature for '{}' must be between 10 and 100°C", rule.source);
+                }
             }
         }
 

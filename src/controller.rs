@@ -12,6 +12,7 @@ use crate::bmc::Bmc;
 use crate::config::{Config, FanMode, Ipmi, Zone};
 use crate::curve::next_duty;
 use crate::ipmi::{IpmiTool, SdrReadings};
+use crate::regulator::{Gains, Inertia, Regulator};
 use crate::sensors::{self, DiskInfo, Reading, SensorData, Source};
 use crate::sim::Simulator;
 use crate::state::{AppState, RuleStatus, Snapshot, ZoneMode, ZoneStatus};
@@ -20,37 +21,71 @@ const HWMON_ROOT: &str = "/sys/class/hwmon";
 /// Check the BMC fan mode every N iterations (a BMC reset puts it back to its default).
 const MODE_CHECK_EVERY: u64 = 6;
 
-/// Computes the duty of a zone. `memory` keeps the last duty of each rule for the hysteresis.
+/// What a rule remembers between two cycles.
+#[derive(Debug, Clone, Default)]
+pub struct RuleMemory {
+    /// Last duty of a curve rule (hysteresis).
+    last: Option<u8>,
+    /// State of a target rule.
+    regulator: Regulator,
+}
+
+/// Computes the duty of a zone. `dt` is the time since the previous cycle, in seconds.
 pub fn compute_zone(
     zone: &Zone,
     data: &SensorData,
     manual: Option<u8>,
     failsafe_duty: u8,
-    memory: &mut Vec<Option<u8>>,
+    memory: &mut Vec<RuleMemory>,
+    dt: f32,
 ) -> ZoneStatus {
     if memory.len() != zone.rules.len() {
-        *memory = vec![None; zone.rules.len()];
+        *memory = vec![RuleMemory::default(); zone.rules.len()];
     }
     let mut rules = Vec::with_capacity(zone.rules.len());
     let mut failsafe = false;
-    for (rule, last) in zone.rules.iter().zip(memory.iter_mut()) {
-        let reading = Source::parse(&rule.source).map_or(Reading::Missing, |s| s.read(data));
-        let (temperature, state, duty) = match reading {
-            Reading::Temp(t) => {
-                let duty = next_duty(&rule.curve, t, *last, zone.hysteresis);
-                *last = Some(duty);
+    for (rule, memory) in zone.rules.iter().zip(memory.iter_mut()) {
+        let source = Source::parse(&rule.source);
+        let reading = source.as_ref().map_or(Reading::Missing, |s| s.read(data));
+        let mut emergency = false;
+        let (temperature, state, duty) = match (reading, rule.target, source.as_ref()) {
+            (Reading::Temp(t), Some(target), Ok(source)) => {
+                let gains = Gains::new(Inertia::of(source), target.reactivity);
+                let out = memory.regulator.update(
+                    t,
+                    target.celsius,
+                    dt,
+                    &gains,
+                    rule.curve.duty_at(t),
+                    zone.min_duty as f32,
+                    zone.max_duty as f32,
+                );
+                emergency = out.emergency;
+                (Some(t), "ok", out.duty)
+            }
+            (Reading::Temp(t), _, _) => {
+                let duty = next_duty(&rule.curve, t, memory.last, zone.hysteresis);
+                memory.last = Some(duty);
                 (Some(t), "ok", duty)
             }
-            Reading::Idle => {
-                *last = None;
+            (Reading::Idle, _, _) => {
+                *memory = RuleMemory::default();
                 (None, "idle", 0)
             }
-            Reading::Missing => {
+            (Reading::Missing, _, _) => {
+                *memory = RuleMemory::default();
                 failsafe = true;
                 (None, "missing", failsafe_duty)
             }
         };
-        rules.push(RuleStatus { source: rule.source.clone(), temperature, state, duty });
+        rules.push(RuleStatus {
+            source: rule.source.clone(),
+            temperature,
+            state,
+            duty,
+            target: rule.target.map(|t| t.celsius),
+            emergency,
+        });
     }
 
     let driver = rules.iter().max_by_key(|r| r.duty).map(|r| r.source.clone());
@@ -78,7 +113,8 @@ pub struct Controller {
     bmc: Bmc,
     bmc_config: Ipmi,
     disks: Arc<Mutex<DiskCache>>,
-    memory: HashMap<u8, Vec<Option<u8>>>,
+    memory: HashMap<u8, Vec<RuleMemory>>,
+    last_cycle: Option<Instant>,
     /// Last duty sent per zone and when.
     applied: HashMap<u8, (u8, Instant)>,
     bmc_failures: u32,
@@ -104,6 +140,7 @@ impl Controller {
             bmc_config: config.ipmi,
             disks: Arc::default(),
             memory: HashMap::new(),
+            last_cycle: None,
             applied: HashMap::new(),
             bmc_failures: 0,
             bmc_error: None,
@@ -171,11 +208,17 @@ impl Controller {
         }
 
         let data = self.read_sensors(config, &sdr);
+        let dt = self
+            .last_cycle
+            .map_or(config.general.interval_secs as f32, |t| t.elapsed().as_secs_f32())
+            .clamp(1.0, 300.0);
+        self.last_cycle = Some(Instant::now());
         let manual = self.state.manual.lock().unwrap().clone();
         let mut zones = Vec::with_capacity(config.zones.len());
         for zone in &config.zones {
             let memory = self.memory.entry(zone.id).or_default();
-            let status = compute_zone(zone, &data, manual.get(&zone.id).copied(), config.general.failsafe_duty, memory);
+            let status =
+                compute_zone(zone, &data, manual.get(&zone.id).copied(), config.general.failsafe_duty, memory, dt);
             if let Some(duty) = status.duty {
                 self.apply(config, &status, duty, dry_run).await;
             }
@@ -401,8 +444,9 @@ pub fn history_path(config_path: &std::path::Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Rule;
+    use crate::config::{Rule, Target};
     use crate::curve::Curve;
+    use crate::regulator::Reactivity;
     use crate::sensors::{DiskKind, DiskState};
 
     fn zone(rules: Vec<Rule>) -> Zone {
@@ -410,7 +454,7 @@ mod tests {
     }
 
     fn rule(source: &str) -> Rule {
-        Rule { source: source.into(), curve: Curve::new(vec![(30.0, 30), (50.0, 100)]) }
+        Rule { source: source.into(), curve: Curve::new(vec![(30.0, 30), (50.0, 100)]), target: None }
     }
 
     fn data(cpu: Option<f32>, hdd: Option<(DiskState, Option<f32>)>) -> SensorData {
@@ -437,20 +481,22 @@ mod tests {
     fn highest_rule_wins_and_limits_apply() {
         let z = zone(vec![rule("cpu"), rule("disks:hdd")]);
         let mut memory = Vec::new();
-        let status = compute_zone(&z, &data(Some(40.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory);
+        let status =
+            compute_zone(&z, &data(Some(40.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory, 10.0);
         assert_eq!(status.mode, ZoneMode::Auto);
         assert_eq!(status.duty, Some(65));
         assert_eq!(status.driver.as_deref(), Some("cpu"));
 
         // max_duty caps the curve.
-        let status = compute_zone(&z, &data(Some(60.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory);
+        let status =
+            compute_zone(&z, &data(Some(60.0), Some((DiskState::Active, Some(35.0)))), None, 100, &mut memory, 10.0);
         assert_eq!(status.duty, Some(90));
     }
 
     #[test]
     fn sleeping_disks_use_min_duty() {
         let z = zone(vec![rule("disks:hdd")]);
-        let status = compute_zone(&z, &data(None, Some((DiskState::Standby, None))), None, 100, &mut Vec::new());
+        let status = compute_zone(&z, &data(None, Some((DiskState::Standby, None))), None, 100, &mut Vec::new(), 10.0);
         assert_eq!(status.mode, ZoneMode::Auto);
         assert_eq!(status.duty, Some(25));
         assert_eq!(status.rules[0].state, "idle");
@@ -459,19 +505,44 @@ mod tests {
     #[test]
     fn missing_source_triggers_failsafe_above_max() {
         let z = zone(vec![rule("cpu")]);
-        let status = compute_zone(&z, &data(None, None), None, 100, &mut Vec::new());
+        let status = compute_zone(&z, &data(None, None), None, 100, &mut Vec::new(), 10.0);
         assert_eq!(status.mode, ZoneMode::Failsafe);
         assert_eq!(status.duty, Some(100));
     }
 
     #[test]
+    fn target_rule_lowers_the_speed_while_below_the_target() {
+        let mut target_rule = rule("disks:hdd");
+        target_rule.target = Some(Target { celsius: 38.0, reactivity: Reactivity::Normal });
+        let z = zone(vec![target_rule]);
+        let cool = data(None, Some((DiskState::Active, Some(36.0))));
+        let mut memory = Vec::new();
+
+        // First cycle starts from the curve: 36°C → 51%.
+        let first = compute_zone(&z, &cool, None, 100, &mut memory, 10.0);
+        assert_eq!(first.duty, Some(51));
+        assert_eq!(first.rules[0].target, Some(38.0));
+
+        // 2°C under the target for 5 minutes: the speed goes down, never below min_duty.
+        let mut duty = 51;
+        for _ in 0..30 {
+            duty = compute_zone(&z, &cool, None, 100, &mut memory, 10.0).duty.unwrap();
+        }
+        assert!((25..=45).contains(&duty), "duty {duty}");
+
+        // Disks asleep: the regulator restarts from the curve next time.
+        compute_zone(&z, &data(None, Some((DiskState::Standby, None))), None, 100, &mut memory, 10.0);
+        assert_eq!(compute_zone(&z, &cool, None, 100, &mut memory, 10.0).duty, Some(51));
+    }
+
+    #[test]
     fn manual_and_unmanaged() {
         let z = zone(vec![rule("cpu")]);
-        let status = compute_zone(&z, &data(None, None), Some(42), 100, &mut Vec::new());
+        let status = compute_zone(&z, &data(None, None), Some(42), 100, &mut Vec::new(), 10.0);
         assert_eq!((status.mode, status.duty), (ZoneMode::Manual, Some(42)));
 
         let empty = zone(vec![]);
-        let status = compute_zone(&empty, &data(Some(40.0), None), None, 100, &mut Vec::new());
+        let status = compute_zone(&empty, &data(Some(40.0), None), None, 100, &mut Vec::new(), 10.0);
         assert_eq!((status.mode, status.duty), (ZoneMode::Unmanaged, None));
     }
 }
