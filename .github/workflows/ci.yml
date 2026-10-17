@@ -91,6 +91,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the changelog needs the history and the previous tags
       - uses: actions/download-artifact@v8
         with:
           name: web-dist
@@ -103,9 +105,16 @@ jobs:
       - run: |
           cp target/x86_64-unknown-linux-musl/release/fanwarden fanwarden-x86_64-linux
           sha256sum fanwarden-x86_64-linux > fanwarden-x86_64-linux.sha256
+      - name: Changelog since the previous tag
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
       - uses: softprops/action-gh-release@v3
         with:
           files: |
             fanwarden-x86_64-linux
             fanwarden-x86_64-linux.sha256
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
