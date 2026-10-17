@@ -87,7 +87,7 @@
                   {#if !sources.some((s) => s.id === rule.source)}
                     <option value={rule.source}>{rule.source} (not found now)</option>
                   {/if}
-                  {#each sources as s (s.id)}
+                  {#each sources as s, i (i)}
                     <option value={s.id}>{s.label}{s.celsius === null ? '' : ` — ${s.celsius}°C`}</option>
                   {/each}
                 </select>

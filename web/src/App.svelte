@@ -101,7 +101,17 @@
     </nav>
 
     <main>
-      <page.component />
+      <svelte:boundary>
+        <page.component />
+        {#snippet failed(error, reset)}
+          <div class="panel crash" role="alert">
+            <h1>This page stopped working</h1>
+            <p>{error instanceof Error ? error.message : String(error)}</p>
+            <p class="soft">The service keeps controlling the fans. Report this message if it comes back.</p>
+            <button onclick={reset}>Try again</button>
+          </div>
+        {/snippet}
+      </svelte:boundary>
     </main>
 
     {#if configStore.dirty || configStore.error}
@@ -221,6 +231,13 @@
     padding-bottom: calc(var(--gutter) + 5rem);
     max-width: 1280px;
     width: 100%;
+  }
+
+  .crash {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+    border-color: var(--critical);
   }
 
   .savebar {

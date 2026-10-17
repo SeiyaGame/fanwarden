@@ -22,13 +22,13 @@ pub struct SensorData {
 }
 
 /// A temperature source referenced by a zone rule, written as a string in the config:
-/// `cpu`, `disks:all|hdd|ssd|nvme`, `disk:<serial>`, `hwmon:<chip>/<label>`, `ipmi:<sensor name>`.
+/// `cpu`, `disks:all|hdd|ssd|nvme`, `disk:<serial>`, `hwmon:<chip>[@<device>]/<label>`, `ipmi:<sensor name>`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Source {
     Cpu,
     Disks(Option<DiskKind>),
     Disk(String),
-    Hwmon { chip: String, label: String },
+    Hwmon { chip: String, device: Option<String>, label: String },
     Ipmi(String),
 }
 
@@ -57,9 +57,13 @@ impl Source {
             ("disk", serial) if !serial.is_empty() => Source::Disk(serial.to_string()),
             ("hwmon", path) => match path.split_once('/') {
                 Some((chip, label)) if !chip.is_empty() && !label.is_empty() => {
-                    Source::Hwmon { chip: chip.to_string(), label: label.to_string() }
+                    let (chip, device) = match chip.split_once('@') {
+                        Some((chip, device)) => (chip, Some(device.to_string())),
+                        None => (chip, None),
+                    };
+                    Source::Hwmon { chip: chip.to_string(), device, label: label.to_string() }
                 }
-                _ => bail!("expected hwmon:<chip>/<label>"),
+                _ => bail!("expected hwmon:<chip>[@<device>]/<label>"),
             },
             ("ipmi", name) if !name.is_empty() => Source::Ipmi(name.to_string()),
             _ => bail!("unknown source '{text}'"),
@@ -70,9 +74,12 @@ impl Source {
         let found = |value: Option<f32>| value.map_or(Reading::Missing, Reading::Temp);
         match self {
             Source::Cpu => found(data.cpu),
-            Source::Hwmon { chip, label } => {
-                found(data.hwmon.iter().find(|h| &h.chip == chip && &h.label == label).map(|h| h.celsius))
-            }
+            Source::Hwmon { chip, device, label } => found(
+                data.hwmon
+                    .iter()
+                    .find(|h| &h.chip == chip && &h.label == label && device.as_ref().is_none_or(|d| &h.device == d))
+                    .map(|h| h.celsius),
+            ),
             Source::Ipmi(name) => found(data.ipmi.iter().find(|t| &t.name == name).and_then(|t| t.celsius)),
             Source::Disk(serial) => {
                 if !data.disks_fresh {
@@ -139,8 +146,15 @@ pub fn available_sources(data: &SensorData) -> Vec<SourceOption> {
     for t in &data.ipmi {
         push(format!("ipmi:{}", t.name), format!("BMC {}", t.name));
     }
-    for h in &data.hwmon {
-        push(format!("hwmon:{}/{}", h.chip, h.label), format!("{} {}", h.chip, h.label));
+    // drivetemp exposes the disks already covered by SMART: not offered twice.
+    for h in data.hwmon.iter().filter(|h| h.chip != "drivetemp") {
+        let id = h.source_id(&data.hwmon);
+        let label = if id.contains('@') {
+            format!("{} {} ({})", h.chip, h.label, h.device)
+        } else {
+            format!("{} {}", h.chip, h.label)
+        };
+        push(id, label);
     }
     options
 }
@@ -184,7 +198,7 @@ mod tests {
         assert_eq!(Source::parse("ipmi:CPU Temp").unwrap(), Source::Ipmi("CPU Temp".into()));
         assert_eq!(
             Source::parse("hwmon:nvme/Composite").unwrap(),
-            Source::Hwmon { chip: "nvme".into(), label: "Composite".into() }
+            Source::Hwmon { chip: "nvme".into(), device: None, label: "Composite".into() }
         );
         assert!(Source::parse("disks:tape").is_err());
         assert!(Source::parse("gpu").is_err());
@@ -200,6 +214,38 @@ mod tests {
         assert_eq!(Source::Disk("A".into()).read(&d), Reading::Temp(35.0));
         assert_eq!(Source::Disk("Z".into()).read(&d), Reading::Missing);
         assert_eq!(Source::Ipmi("System Temp".into()).read(&d), Reading::Temp(30.0));
+    }
+
+    #[test]
+    fn hwmon_ids_are_unique_and_resolvable() {
+        let t = |chip: &str, device: &str, label: &str, c: f32| HwmonTemp {
+            chip: chip.into(),
+            device: device.into(),
+            label: label.into(),
+            celsius: c,
+        };
+        let mut d = data();
+        d.hwmon = vec![
+            t("k10temp", "0000:00:18.3", "Tctl", 45.0),
+            t("cxgb4_0000:85:00.4", "0000:85:00.4", "temp1", 50.0),
+            t("nvme", "nvme0", "Composite", 40.0),
+            t("nvme", "nvme1", "Composite", 42.0),
+            t("drivetemp", "0:0:0:0", "temp1", 33.0),
+            t("drivetemp", "1:0:0:0", "temp1", 35.0),
+        ];
+        let options = available_sources(&d);
+        let ids: Vec<&str> = options.iter().map(|o| o.id.as_str()).collect();
+        let unique: std::collections::HashSet<&&str> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len(), "duplicate source ids: {ids:?}");
+        assert!(ids.contains(&"hwmon:k10temp/Tctl"));
+        assert!(ids.contains(&"hwmon:nvme@nvme1/Composite"));
+        assert!(!ids.iter().any(|id| id.contains("drivetemp")));
+
+        let read = |id: &str| Source::parse(id).unwrap().read(&d);
+        assert_eq!(read("hwmon:nvme@nvme1/Composite"), Reading::Temp(42.0));
+        assert_eq!(read("hwmon:cxgb4_0000:85:00.4/temp1"), Reading::Temp(50.0));
+        // Without a device, the first chip matching the name.
+        assert_eq!(read("hwmon:nvme/Composite"), Reading::Temp(40.0));
     }
 
     #[test]

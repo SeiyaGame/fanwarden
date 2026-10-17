@@ -51,7 +51,7 @@
       <section class="panel" aria-labelledby="fans-title">
         <h2 id="fans-title">Fans</h2>
         <ul class="fans">
-          {#each s.fans as fan (fan.name)}
+          {#each s.fans as fan, i (i)}
             <li class:empty={fan.rpm === null}>
               <Rotor rpm={fan.rpm} size={34} />
               <span class="name">{fan.name}</span>
@@ -73,7 +73,7 @@
               {s.sensors.cpu === null ? '—' : `${s.sensors.cpu.toFixed(1)}°C`}
             </dd>
           </div>
-          {#each boardTemps as t (t.name)}
+          {#each boardTemps as t, i (i)}
             <div>
               <dt>{t.name}</dt>
               <dd class="figure">

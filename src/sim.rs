@@ -106,7 +106,22 @@ impl Simulator {
         let cpu = self.cpu();
         SensorData {
             cpu: Some((cpu * 10.0).round() / 10.0),
-            hwmon: vec![crate::sensors::HwmonTemp { chip: "k10temp".into(), label: "Tctl".into(), celsius: cpu }],
+            // Same layout as a real server: several chips share a name (one drivetemp per disk).
+            hwmon: [
+                ("k10temp", "0000:00:18.3", "Tctl", cpu),
+                ("nvme", "nvme0", "Composite", 44.0),
+                ("cxgb4_0000:85:00.4", "0000:85:00.4", "temp1", 52.0),
+                ("drivetemp", "0:0:0:0", "temp1", 33.0),
+                ("drivetemp", "1:0:0:0", "temp1", 35.0),
+            ]
+            .into_iter()
+            .map(|(chip, device, label, celsius)| crate::sensors::HwmonTemp {
+                chip: chip.into(),
+                device: device.into(),
+                label: label.into(),
+                celsius,
+            })
+            .collect(),
             disks,
             disks_fresh: true,
             ipmi: Vec::new(),

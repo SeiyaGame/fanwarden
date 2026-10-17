@@ -54,7 +54,7 @@
 
   {#if zone.rules.length}
     <ul class="rules">
-      {#each zone.rules as rule (rule.source)}
+      {#each zone.rules as rule, i (i)}
         <li class:driving={rule === driver}>
           <span
             class="swatch"

@@ -18,6 +18,10 @@ pub async fn run(program: &str, args: &[String], envs: &[(&str, &str)], timeout:
     for (key, value) in envs {
         command.env(key, value);
     }
+    // Own process group: a Ctrl+C in the terminal stops fanwarden, which then restores the fan
+    // mode itself, instead of also killing the ipmitool it is running.
+    #[cfg(unix)]
+    command.process_group(0);
     let child = command.spawn().with_context(|| format!("cannot start {program}"))?;
     let output = match tokio::time::timeout(timeout, child.wait_with_output()).await {
         Ok(output) => output.with_context(|| format!("{program} failed"))?,

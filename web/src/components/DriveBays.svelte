@@ -19,7 +19,7 @@
   </p>
 {:else}
   <ul class="bays">
-    {#each disks as disk (disk.serial)}
+    {#each disks as disk (disk.name)}
       <li
         class="bay"
         class:asleep={disk.state === 'standby'}

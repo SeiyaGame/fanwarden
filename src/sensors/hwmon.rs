@@ -7,8 +7,23 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct HwmonTemp {
     pub chip: String,
+    /// Device the chip belongs to (PCI or SCSI address): tells apart chips with the same name.
+    pub device: String,
     pub label: String,
     pub celsius: f32,
+}
+
+impl HwmonTemp {
+    /// Source id: `hwmon:<chip>/<label>`, or `hwmon:<chip>@<device>/<label>` when several
+    /// chips share the name (one `drivetemp` per disk, several NICs...).
+    pub fn source_id(&self, all: &[HwmonTemp]) -> String {
+        let shared = all.iter().filter(|h| h.chip == self.chip && h.label == self.label).count() > 1;
+        if shared && !self.device.is_empty() {
+            format!("hwmon:{}@{}/{}", self.chip, self.device, self.label)
+        } else {
+            format!("hwmon:{}/{}", self.chip, self.label)
+        }
+    }
 }
 
 const CPU_CHIPS: [&str; 3] = ["k10temp", "zenpower", "coretemp"];
@@ -26,6 +41,10 @@ pub fn read_all(root: &Path) -> Vec<HwmonTemp> {
             continue;
         };
         let chip = chip.trim().to_string();
+        let device = std::fs::read_link(dir.join("device"))
+            .ok()
+            .and_then(|target| target.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_default();
         let Ok(files) = std::fs::read_dir(&dir) else {
             continue;
         };
@@ -45,7 +64,12 @@ pub fn read_all(root: &Path) -> Vec<HwmonTemp> {
             let label = std::fs::read_to_string(dir.join(format!("{index}_label")))
                 .map(|l| l.trim().to_string())
                 .unwrap_or_else(|_| index.to_string());
-            temps.push(HwmonTemp { chip: chip.clone(), label, celsius: millis as f32 / 1000.0 });
+            temps.push(HwmonTemp {
+                chip: chip.clone(),
+                device: device.clone(),
+                label,
+                celsius: millis as f32 / 1000.0,
+            });
         }
     }
     temps
@@ -87,19 +111,32 @@ mod tests {
         let temps = read_all(root.path());
         assert_eq!(temps.len(), 3);
         assert_eq!(cpu_temperature(&temps), Some(45.25));
-        assert_eq!(temps[2], HwmonTemp { chip: "nvme".into(), label: "Composite".into(), celsius: 38.85 });
+        assert_eq!(
+            temps[2],
+            HwmonTemp { chip: "nvme".into(), device: String::new(), label: "Composite".into(), celsius: 38.85 }
+        );
     }
 
     #[test]
     fn intel_dual_socket_takes_hottest_package() {
-        let t = |label: &str, c: f32| HwmonTemp { chip: "coretemp".into(), label: label.into(), celsius: c };
+        let t = |label: &str, c: f32| HwmonTemp {
+            chip: "coretemp".into(),
+            device: String::new(),
+            label: label.into(),
+            celsius: c,
+        };
         let temps = vec![t("Package id 0", 50.0), t("Core 0", 55.0), t("Package id 1", 61.0)];
         assert_eq!(cpu_temperature(&temps), Some(61.0));
     }
 
     #[test]
     fn falls_back_to_cores() {
-        let t = |label: &str, c: f32| HwmonTemp { chip: "coretemp".into(), label: label.into(), celsius: c };
+        let t = |label: &str, c: f32| HwmonTemp {
+            chip: "coretemp".into(),
+            device: String::new(),
+            label: label.into(),
+            celsius: c,
+        };
         assert_eq!(cpu_temperature(&[t("Core 0", 40.0), t("Core 1", 44.0)]), Some(44.0));
         assert_eq!(cpu_temperature(&[]), None);
     }
