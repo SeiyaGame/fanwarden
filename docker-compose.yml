@@ -1,8 +1,8 @@
 services:
-  fan-control:
+  fanwarden:
     # Pin a version (e.g. :1.2.0) to choose when to upgrade; :latest follows releases.
-    image: ghcr.io/seiyagame/fan_control_supermicro:latest
-    container_name: fan-control
+    image: ghcr.io/seiyagame/fanwarden:latest
+    container_name: fanwarden
     restart: unless-stopped
 
     # Simple mode: runs as root in a privileged container with the host /dev, so the BMC
@@ -17,8 +17,8 @@ services:
       - TZ=Europe/Paris
       # false = hardened mode (README)
       - RUN_AS_ROOT=true
-      # More details in the logs: fan_control=debug
-      - RUST_LOG=fan_control=info
+      # More details in the logs: fanwarden=debug
+      - RUST_LOG=fanwarden=info
 
     volumes:
       - ./data:/data # config.toml and history.db

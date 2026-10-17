@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use crate::state::AppState;
 
-pub const COOKIE: &str = "fan_control_session";
+pub const COOKIE: &str = "fanwarden_session";
 /// Failed logins tolerated per minute before refusing every attempt.
 const MAX_FAILURES_PER_MINUTE: u32 = 10;
 pub const MIN_PASSWORD_LEN: usize = 8;

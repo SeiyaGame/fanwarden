@@ -1,11 +1,10 @@
-//! Prometheus exposition format. Metric names are kept from the Python version so
-//! existing dashboards keep working.
+//! Prometheus exposition format, metrics prefixed with `fanwarden_`.
 
 use std::fmt::Write;
 
 use crate::state::Snapshot;
 
-const PREFIX: &str = "fan_control_supermicro";
+const PREFIX: &str = "fanwarden";
 
 fn escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
@@ -94,9 +93,9 @@ mod tests {
             FanReading { name: "FAN4".into(), rpm: None, status: "ns".into() },
         ];
         let text = render(&s);
-        assert!(text.contains("fan_control_supermicro_cpu_temperature 41\n"));
-        assert!(text.contains("fan_control_supermicro_ipmi_fan_speed{name=\"FAN1\"} 700\n"));
-        assert!(text.contains("fan_control_supermicro_ipmi_fan_speed{name=\"FAN4\"} -1\n"));
-        assert!(text.contains("fan_control_supermicro_bmc_up 1\n"));
+        assert!(text.contains("fanwarden_cpu_temperature 41\n"));
+        assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN1\"} 700\n"));
+        assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN4\"} -1\n"));
+        assert!(text.contains("fanwarden_bmc_up 1\n"));
     }
 }

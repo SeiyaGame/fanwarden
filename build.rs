@@ -10,7 +10,7 @@ fn main() {
         std::fs::create_dir_all(dist).expect("cannot create web/dist");
         std::fs::write(
             dist.join("index.html"),
-            "<!doctype html><title>fan-control</title><p>Web UI not built: run <code>npm ci &amp;&amp; npm run build</code> in <code>web/</code>.</p>",
+            "<!doctype html><title>fanwarden</title><p>Web UI not built: run <code>npm ci &amp;&amp; npm run build</code> in <code>web/</code>.</p>",
         )
         .expect("cannot write placeholder UI");
     }

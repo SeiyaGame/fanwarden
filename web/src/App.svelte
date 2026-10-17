@@ -73,7 +73,7 @@
     <nav aria-label="Sections">
       <a class="brand" href="#/">
         <Rotor rpm={cpuRpm} size={30} color="var(--warm)" />
-        <span>Fan control</span>
+        <span>Fanwarden</span>
       </a>
       <ul>
         {#each PAGES as p (p.path)}

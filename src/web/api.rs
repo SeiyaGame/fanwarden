@@ -290,7 +290,7 @@ pub async fn test_notification(
     };
     let notification = Notification {
         title: "Test".into(),
-        message: "Test notification from fan-control".into(),
+        message: "Test notification from fanwarden".into(),
         severity: Severity::Info,
     };
     state.notifier.send(&channel, &notification).await.map_err(|e| bad_request(format!("{e:#}")))?;

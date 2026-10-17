@@ -49,7 +49,7 @@ pub struct EventLayer(pub EventLog);
 impl<S: Subscriber> Layer<S> for EventLayer {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let level = *event.metadata().level();
-        if level > Level::INFO || !event.metadata().target().starts_with("fan_control") {
+        if level > Level::INFO || !event.metadata().target().starts_with("fanwarden") {
             return;
         }
         let mut visitor = MessageVisitor::default();

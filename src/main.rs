@@ -8,20 +8,20 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
 
-use fan_control::config::Config;
-use fan_control::controller::{self, Controller};
-use fan_control::events::{EventLayer, EventLog};
-use fan_control::history::History;
-use fan_control::ipmi::IpmiTool;
-use fan_control::state::AppState;
-use fan_control::web;
+use fanwarden::config::Config;
+use fanwarden::controller::{self, Controller};
+use fanwarden::events::{EventLayer, EventLog};
+use fanwarden::history::History;
+use fanwarden::ipmi::IpmiTool;
+use fanwarden::state::AppState;
+use fanwarden::web;
 
 /// Fan control for Supermicro motherboards through IPMI, with a web UI.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
     /// Configuration file (created with defaults if missing).
-    #[arg(short, long, env = "FAN_CONTROL_CONFIG", default_value = "/etc/fan-control/config.toml", global = true)]
+    #[arg(short, long, env = "FANWARDEN_CONFIG", default_value = "/etc/fanwarden/config.toml", global = true)]
     config: PathBuf,
 
     /// Read sensors and compute speeds, but never write to the BMC.
@@ -33,7 +33,7 @@ struct Cli {
     simulate: bool,
 
     /// Overrides `web.listen` from the configuration.
-    #[arg(long, env = "FAN_CONTROL_LISTEN", global = true)]
+    #[arg(long, env = "FANWARDEN_LISTEN", global = true)]
     listen: Option<String>,
 
     #[command(subcommand)]
@@ -92,7 +92,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer().with_target(false).with_filter(
-                EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("fan_control=info,warn")),
+                EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("fanwarden=info,warn")),
             ),
         )
         .with(EventLayer(events.clone()))
@@ -124,7 +124,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
     let listener =
         tokio::net::TcpListener::bind(&listen).await.with_context(|| format!("cannot listen on {listen}"))?;
-    tracing::info!("fan-control {} - web UI on http://{listen}", env!("CARGO_PKG_VERSION"));
+    tracing::info!("fanwarden {} - web UI on http://{listen}", env!("CARGO_PKG_VERSION"));
     let mut server_shutdown = shutdown_rx.clone();
     let server = tokio::spawn(
         axum::serve(listener, web::router(state.clone()))

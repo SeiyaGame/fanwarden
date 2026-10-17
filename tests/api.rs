@@ -9,10 +9,10 @@ use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-use fan_control::config::{Config, NotificationChannel, SECRET_PLACEHOLDER};
-use fan_control::events::EventLog;
-use fan_control::state::{AppState, Snapshot};
-use fan_control::web;
+use fanwarden::config::{Config, NotificationChannel, SECRET_PLACEHOLDER};
+use fanwarden::events::EventLog;
+use fanwarden::state::{AppState, Snapshot};
+use fanwarden::web;
 
 struct App {
     router: Router,
@@ -188,7 +188,7 @@ async fn metrics_are_public_and_can_be_disabled() {
 
     let (status, body, _) = app.call("GET", "/metrics", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body.as_str().unwrap().contains("fan_control_supermicro_cpu_temperature 42"));
+    assert!(body.as_str().unwrap().contains("fanwarden_cpu_temperature 42"));
 
     config.web.metrics_enabled = false;
     app.state.set_config(config).unwrap();

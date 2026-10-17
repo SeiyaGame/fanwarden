@@ -14,7 +14,7 @@ run_rust() {
       echo "==> cargo not found, running the Rust checks in WSL"
       local dir
       dir="$(wsl.exe wslpath -a "$(pwd -W 2>/dev/null || pwd)" | tr -d '\r')"
-      wsl.exe bash -lc "cd '$dir' && CARGO_TARGET_DIR=\${CARGO_TARGET_DIR:-\$HOME/.cache/fan-control-target} scripts/check.sh rust"
+      wsl.exe bash -lc "cd '$dir' && CARGO_TARGET_DIR=\${CARGO_TARGET_DIR:-\$HOME/.cache/fanwarden-target} scripts/check.sh rust"
       return
     fi
     echo "cargo not found: install Rust (https://rustup.rs)" >&2

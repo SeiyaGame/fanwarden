@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Installs fan-control as a systemd service (Debian, Proxmox, TrueNAS SCALE...).
+# Installs fanwarden as a systemd service (Debian, Proxmox, TrueNAS SCALE...).
 #
-#   sudo ./install.sh                         download the latest release into /opt/fan-control
-#   sudo ./install.sh --binary ./fan-control  install a binary you built yourself
-#   sudo ./install.sh --dir /mnt/tank/apps/fan-control
+#   sudo ./install.sh                         download the latest release into /opt/fanwarden
+#   sudo ./install.sh --binary ./fanwarden    install a binary you built yourself
+#   sudo ./install.sh --dir /mnt/tank/apps/fanwarden
 #   sudo ./install.sh --service-only --dir DIR   only (re)create the service (TrueNAS post-init)
 set -euo pipefail
 
-REPO="${FAN_CONTROL_REPO:-SeiyaGame/fan_control_supermicro}"
-DIR=/opt/fan-control
+REPO="${FANWARDEN_REPO:-SeiyaGame/fanwarden}"
+DIR=/opt/fanwarden
 BINARY=""
 SERVICE_ONLY=false
-UNIT=/etc/systemd/system/fan-control.service
+UNIT=/etc/systemd/system/fanwarden.service
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -31,7 +31,7 @@ if [ -e /etc/truenas_version ] || command -v midclt >/dev/null 2>&1; then
   # The TrueNAS boot pool is replaced on every update: keep everything on a data pool.
   case "$DIR" in
     /mnt/*) ;;
-    *) echo "On TrueNAS, install on a pool: --dir /mnt/<pool>/apps/fan-control" >&2; exit 1 ;;
+    *) echo "On TrueNAS, install on a pool: --dir /mnt/<pool>/apps/fanwarden" >&2; exit 1 ;;
   esac
 fi
 
@@ -40,21 +40,21 @@ for tool in ipmitool smartctl lsblk; do
 done
 
 mkdir -p "$DIR"
-BIN="$DIR/fan-control"
+BIN="$DIR/fanwarden"
 CONFIG="$DIR/config.toml"
 
 if ! $SERVICE_ONLY; then
   if [ -n "$BINARY" ]; then
     install -m 0755 "$BINARY" "$BIN"
   else
-    url="https://github.com/$REPO/releases/latest/download/fan-control-x86_64-linux"
+    url="https://github.com/$REPO/releases/latest/download/fanwarden-x86_64-linux"
     echo "Downloading $url"
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT
-    curl -fsSL "$url" -o "$tmp/fan-control-x86_64-linux"
-    curl -fsSL "$url.sha256" -o "$tmp/fan-control-x86_64-linux.sha256"
-    (cd "$tmp" && sha256sum -c fan-control-x86_64-linux.sha256)
-    install -m 0755 "$tmp/fan-control-x86_64-linux" "$BIN"
+    curl -fsSL "$url" -o "$tmp/fanwarden-x86_64-linux"
+    curl -fsSL "$url.sha256" -o "$tmp/fanwarden-x86_64-linux.sha256"
+    (cd "$tmp" && sha256sum -c fanwarden-x86_64-linux.sha256)
+    install -m 0755 "$tmp/fanwarden-x86_64-linux" "$BIN"
   fi
   "$BIN" --config "$CONFIG" check-config
   chmod 600 "$CONFIG"
@@ -64,7 +64,7 @@ fi
 
 cat >"$UNIT" <<EOF
 [Unit]
-Description=Supermicro fan control
+Description=fanwarden (Supermicro fan control)
 After=network-online.target
 Wants=network-online.target
 
@@ -80,13 +80,13 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable fan-control >/dev/null 2>&1 || true
-systemctl restart fan-control
+systemctl enable fanwarden >/dev/null 2>&1 || true
+systemctl restart fanwarden
 
 port="$(sed -n 's/^listen = ".*:\([0-9]*\)"/\1/p' "$CONFIG" | head -n1)"
 echo
-echo "fan-control is running: http://$(hostname -I 2>/dev/null | awk '{print $1}'):${port:-9495}"
-echo "Open it to choose the web password. Logs: journalctl -u fan-control -f"
+echo "fanwarden is running: http://$(hostname -I 2>/dev/null | awk '{print $1}'):${port:-9495}"
+echo "Open it to choose the web password. Logs: journalctl -u fanwarden -f"
 if $is_truenas; then
   echo
   echo "TrueNAS resets /etc on updates. Add this under System > Advanced > Init/Shutdown Scripts"

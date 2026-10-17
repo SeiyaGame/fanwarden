@@ -1,21 +1,21 @@
-# Hardened mode: fan-control runs as PUID/PGID in an unprivileged container that only gets
+# Hardened mode: fanwarden runs as PUID/PGID in an unprivileged container that only gets
 # the BMC, the listed disks and the capabilities SMART needs.
 #   docker compose -f docker-compose.hardened.yml up -d
 # Adapt `devices:` to your disks (`lsblk -d -o NAME,MODEL,SERIAL` on the host).
 services:
-  fan-control:
+  fanwarden:
     # Pin a version (e.g. :1.2.0) to choose when to upgrade; :latest follows releases.
-    image: ghcr.io/seiyagame/fan_control_supermicro:latest
-    container_name: fan-control
+    image: ghcr.io/seiyagame/fanwarden:latest
+    container_name: fanwarden
     restart: unless-stopped
 
     environment:
-      # fan-control runs as this user, and owns the files in ./data (`id` on the host)
+      # fanwarden runs as this user, and owns the files in ./data (`id` on the host)
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
       - RUN_AS_ROOT=false
-      - RUST_LOG=fan_control=info
+      - RUST_LOG=fanwarden=info
 
     devices:
       # Local BMC (not needed with a remote BMC)

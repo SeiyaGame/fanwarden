@@ -1,4 +1,4 @@
-# fan-control
+# fanwarden
 
 Fan control for Supermicro motherboards through IPMI, driven by CPU and disk temperatures, with a web UI.
 
@@ -25,11 +25,11 @@ Requirements on the server: `ipmitool`, `smartmontools`, `lsblk` (already presen
 ```bash
 # Debian / Proxmox
 sudo apt install ipmitool smartmontools
-curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fan_control_supermicro/main/install.sh
+curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fanwarden/main/install.sh
 sudo bash install.sh
 
 # TrueNAS SCALE: install on a pool, the boot pool is replaced on updates
-sudo bash install.sh --dir /mnt/tank/apps/fan-control
+sudo bash install.sh --dir /mnt/tank/apps/fanwarden
 ```
 
 Then open `http://<server>:9495` and choose the web password. The configuration is in `config.toml`
@@ -43,12 +43,12 @@ Init/Shutdown Scripts) so the service is recreated after a TrueNAS update.
 ### Docker
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fan_control_supermicro/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fanwarden/main/docker-compose.yml
 docker compose up -d
 ```
 
-Images are published on `ghcr.io/seiyagame/fan_control_supermicro`: `latest` and `X.Y.Z` for releases,
-`edge` for the main branch. To build the image yourself: `docker build -t fan-control .`
+Images are published on `ghcr.io/seiyagame/fanwarden`: `latest` and `X.Y.Z` for releases,
+`edge` for the main branch. To build the image yourself: `docker build -t fanwarden .`
 
 | Variable | Default | |
 | -------- | ------- | - |
@@ -61,7 +61,7 @@ found without any setup. A privileged container is close to root on the host.
 
 #### Hardened mode
 
-fan-control runs as `PUID:PGID` in an unprivileged container that only receives the BMC, the disks
+fanwarden runs as `PUID:PGID` in an unprivileged container that only receives the BMC, the disks
 and the capabilities SMART needs. The entrypoint gives `abc` access to the devices passed in
 `devices:` (the container's own copies: the host is not changed) and grants smartctl the capabilities
 allowed by `cap_add`.
@@ -86,16 +86,16 @@ Limits:
 ## Command line
 
 ```
-fan-control [--config FILE] [--dry-run] [--simulate] [--listen ADDR]
-fan-control set-password      # reset the web password (read from stdin)
-fan-control check-config      # validate the configuration
-fan-control healthcheck       # exit 0 if the service answers (used by the Docker image)
+fanwarden [--config FILE] [--dry-run] [--simulate] [--listen ADDR]
+fanwarden set-password      # reset the web password (read from stdin)
+fanwarden check-config      # validate the configuration
+fanwarden healthcheck       # exit 0 if the service answers (used by the Docker image)
 ```
 
 - `--dry-run`: read and compute, never write to the BMC.
 - `--simulate`: fake BMC and sensors, to try the UI on any Linux machine.
 
-Logs go to the journal (`journalctl -u fan-control -f`); the last 1000 events are also in the UI.
+Logs go to the journal (`journalctl -u fanwarden -f`); the last 1000 events are also in the UI.
 
 ## Development
 

@@ -1,4 +1,4 @@
-//! `fan-control healthcheck`: asks the running service if it answers (Docker HEALTHCHECK).
+//! `fanwarden healthcheck`: asks the running service if it answers (Docker HEALTHCHECK).
 
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};

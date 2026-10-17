@@ -32,7 +32,7 @@ impl Default for Notifier {
     fn default() -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
-            .user_agent(concat!("fan-control/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("fanwarden/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("HTTP client");
         Self { client }

@@ -101,11 +101,11 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
       - run: cargo build --release --locked --target x86_64-unknown-linux-musl
       - run: |
-          cp target/x86_64-unknown-linux-musl/release/fan-control fan-control-x86_64-linux
-          sha256sum fan-control-x86_64-linux > fan-control-x86_64-linux.sha256
+          cp target/x86_64-unknown-linux-musl/release/fanwarden fanwarden-x86_64-linux
+          sha256sum fanwarden-x86_64-linux > fanwarden-x86_64-linux.sha256
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            fan-control-x86_64-linux
-            fan-control-x86_64-linux.sha256
+            fanwarden-x86_64-linux
+            fanwarden-x86_64-linux.sha256
           generate_release_notes: true

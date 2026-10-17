@@ -32,7 +32,7 @@
   <form class="panel" onsubmit={submit}>
     <div class="brand">
       <Rotor rpm={setup ? 900 : 500} size={44} color="var(--warm)" />
-      <h1>Fan control</h1>
+      <h1>Fanwarden</h1>
     </div>
     {#if setup}
       <p class="soft">Choose the password that protects this page. It needs at least 8 characters.</p>

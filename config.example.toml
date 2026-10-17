@@ -1,4 +1,4 @@
-# Example configuration for fan-control.
+# Example configuration for fanwarden.
 # Copy it to config.toml (next to the binary, or /data/config.toml in Docker), or start
 # without a file: a default one is created. Everything can then be changed from the web UI.
 # The web password is chosen on the first visit (password_hash stays empty here).

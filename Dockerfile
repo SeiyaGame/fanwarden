@@ -15,18 +15,18 @@ COPY src ./src
 COPY --from=web /web/dist ./web/dist
 RUN cargo build --release --locked
 
-# Runtime: the tools fan-control calls
+# Runtime: the tools fanwarden calls
 FROM alpine:3.22
 RUN apk add --no-cache ipmitool smartmontools lsblk tzdata shadow su-exec libcap-setcap \
     && addgroup -g 1000 abc \
     && adduser -D -H -u 1000 -G abc abc
-COPY --from=build /src/target/release/fan-control /usr/local/bin/fan-control
+COPY --from=build /src/target/release/fanwarden /usr/local/bin/fanwarden
 COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
-ENV FAN_CONTROL_CONFIG=/data/config.toml \
+ENV FANWARDEN_CONFIG=/data/config.toml \
     PUID=1000 \
     PGID=1000 \
     RUN_AS_ROOT=true
 VOLUME /data
 EXPOSE 9495
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 CMD ["fan-control", "healthcheck"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 CMD ["fanwarden", "healthcheck"]
 ENTRYPOINT ["/entrypoint.sh"]

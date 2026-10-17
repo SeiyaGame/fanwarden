@@ -1,7 +1,7 @@
 #!/bin/sh
 # Container entrypoint.
 #   RUN_AS_ROOT=true  (default) everything runs as root, in a privileged container with /dev.
-#   RUN_AS_ROOT=false hardened mode: fan-control runs as PUID/PGID, the container only gets
+#   RUN_AS_ROOT=false hardened mode: fanwarden runs as PUID/PGID, the container only gets
 #                     the devices it needs (see "Hardened mode" in the README).
 set -e
 
@@ -27,13 +27,13 @@ Run as root: $RUN_AS_ROOT
 ──────────────────────────────────"
 
 # Create the default configuration on first start, then hand /data to the host user.
-mkdir -p "$(dirname "$FAN_CONTROL_CONFIG")"
-[ -f "$FAN_CONTROL_CONFIG" ] || fan-control check-config >/dev/null
-chown -R abc:abc "$(dirname "$FAN_CONTROL_CONFIG")"
+mkdir -p "$(dirname "$FANWARDEN_CONFIG")"
+[ -f "$FANWARDEN_CONFIG" ] || fanwarden check-config >/dev/null
+chown -R abc:abc "$(dirname "$FANWARDEN_CONFIG")"
 
 if [ "$RUN_AS_ROOT" = "true" ]; then
-    # Files keep the PUID/PGID owner: fan-control preserves it when saving the configuration.
-    exec fan-control "$@"
+    # Files keep the PUID/PGID owner: fanwarden preserves it when saving the configuration.
+    exec fanwarden "$@"
 fi
 
 # ---- Hardened mode -------------------------------------------------------------------------
@@ -69,4 +69,4 @@ else
     echo "warning: no SYS_RAWIO capability, disk temperatures will not be readable (cap_add: SYS_RAWIO)" >&2
 fi
 
-exec su-exec abc fan-control "$@"
+exec su-exec abc fanwarden "$@"
