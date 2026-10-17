@@ -1,0 +1,59 @@
+# Hardened mode: fan-control runs as PUID/PGID in an unprivileged container that only gets
+# the BMC, the listed disks and the capabilities SMART needs.
+#   docker compose -f docker-compose.hardened.yml up -d
+# Adapt `devices:` to your disks (`lsblk -d -o NAME,MODEL,SERIAL` on the host).
+services:
+  fan-control:
+    # Pin a version (e.g. :1.2.0) to choose when to upgrade; :latest follows releases.
+    image: ghcr.io/seiyagame/fan_control_supermicro:latest
+    container_name: fan-control
+    restart: unless-stopped
+
+    environment:
+      # fan-control runs as this user, and owns the files in ./data (`id` on the host)
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - RUN_AS_ROOT=false
+      - RUST_LOG=fan_control=info
+
+    devices:
+      # Local BMC (not needed with a remote BMC)
+      - /dev/ipmi0
+      # Every disk to monitor, under the same name as on the host (disks are listed with
+      # lsblk, which sees the host names: do not rename them). A disk missing here is ignored.
+      - /dev/sda
+      - /dev/sdb
+      - /dev/sdc
+      - /dev/sdd
+      # - /dev/nvme0n1
+
+    cap_add:
+      - SYS_RAWIO # SMART on SATA/SAS disks
+      # - SYS_ADMIN # only for NVMe drives: a broad capability, leave it out otherwise
+
+    # Never mount /dev as a volume in this mode: the entrypoint refuses to start.
+    volumes:
+      - ./data:/data # config.toml and history.db
+
+    ports:
+      - "9495:9495" # web UI and /metrics
+
+    # On stop the fans are handed back to the BMC: leave it time to send the command.
+    stop_grace_period: 30s
+
+    # Do not add `security_opt: no-new-privileges`: smartctl gets its capabilities from
+    # file capabilities, which that option disables.
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9495/api/auth/status"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

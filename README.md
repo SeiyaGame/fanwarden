@@ -66,32 +66,11 @@ and the capabilities SMART needs. The entrypoint gives `abc` access to the devic
 `devices:` (the container's own copies: the host is not changed) and grants smartctl the capabilities
 allowed by `cap_add`.
 
-```yaml
-services:
-  fan-control:
-    image: ghcr.io/seiyagame/fan_control_supermicro:latest
-    container_name: fan-control
-    restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-      - RUN_AS_ROOT=false
-    devices:
-      - /dev/ipmi0
-      # Every disk to monitor, under the same name as on the host (disks are listed with
-      # lsblk, which sees the host names: do not rename them here)
-      - /dev/sda
-      - /dev/sdb
-      - /dev/nvme0n1
-    cap_add:
-      - SYS_RAWIO    # SMART on SATA/SAS disks
-      - SYS_ADMIN    # only if NVMe drives are listed above
-    volumes:
-      - ./data:/data
-    ports:
-      - "9495:9495"
-    stop_grace_period: 30s
+Example: [`docker-compose.hardened.yml`](docker-compose.hardened.yml). List your BMC and disks under
+`devices:`, then:
+
+```bash
+docker compose -f docker-compose.hardened.yml up -d
 ```
 
 Limits:
