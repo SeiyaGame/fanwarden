@@ -1,0 +1,285 @@
+//! JSON API used by the web UI.
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use axum::Json;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::{Path, Query, State};
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
+use serde::Deserialize;
+use serde_json::json;
+
+use super::auth;
+use crate::config::{Config, NotificationChannel};
+use crate::notify::{Notification, Severity};
+use crate::state::AppState;
+
+type ApiResult = Result<Response, ApiError>;
+
+pub struct ApiError(StatusCode, String);
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (self.0, Json(json!({ "error": self.1 }))).into_response()
+    }
+}
+
+fn bad_request(message: impl std::fmt::Display) -> ApiError {
+    ApiError(StatusCode::BAD_REQUEST, message.to_string())
+}
+
+impl From<anyhow::Error> for ApiError {
+    fn from(e: anyhow::Error) -> Self {
+        ApiError(StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}"))
+    }
+}
+
+// ---- Authentication ------------------------------------------------------------------------
+
+pub async fn auth_status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Json<serde_json::Value> {
+    let setup_required = state.config().web.password_hash.is_empty();
+    let authenticated = auth::session_token(&headers).is_some_and(|t| state.sessions.is_valid(&t));
+    Json(json!({ "setup_required": setup_required, "authenticated": authenticated }))
+}
+
+#[derive(Deserialize)]
+pub struct PasswordBody {
+    password: String,
+}
+
+fn login_response(state: &AppState, hours: u64) -> Response {
+    let token = state.sessions.create(hours);
+    ([(header::SET_COOKIE, auth::session_cookie(&token, hours))], Json(json!({ "ok": true }))).into_response()
+}
+
+/// First start: choose the password. Only allowed while none is set.
+pub async fn setup(State(state): State<Arc<AppState>>, Json(body): Json<PasswordBody>) -> ApiResult {
+    let mut config = state.config();
+    if !config.web.password_hash.is_empty() {
+        return Err(ApiError(StatusCode::CONFLICT, "a password is already set".into()));
+    }
+    if body.password.chars().count() < auth::MIN_PASSWORD_LEN {
+        return Err(bad_request(format!("the password needs at least {} characters", auth::MIN_PASSWORD_LEN)));
+    }
+    config.web.password_hash = auth::hash_password(&body.password)?;
+    state.set_config(config.clone())?;
+    tracing::info!("web UI password created");
+    Ok(login_response(&state, config.web.session_hours))
+}
+
+pub async fn login(State(state): State<Arc<AppState>>, Json(body): Json<PasswordBody>) -> ApiResult {
+    if state.sessions.too_many_failures() {
+        return Err(ApiError(StatusCode::TOO_MANY_REQUESTS, "too many attempts, wait a minute".into()));
+    }
+    let config = state.config();
+    let hash = config.web.password_hash.clone();
+    let password = body.password;
+    let valid = tokio::task::spawn_blocking(move || auth::verify_password(&hash, &password)).await.unwrap_or(false);
+    if !valid {
+        state.sessions.record_failure();
+        tracing::warn!("failed login on the web UI");
+        // Slows down guessing.
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        return Err(ApiError(StatusCode::UNAUTHORIZED, "wrong password".into()));
+    }
+    Ok(login_response(&state, config.web.session_hours))
+}
+
+pub async fn logout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Some(token) = auth::session_token(&headers) {
+        state.sessions.remove(&token);
+    }
+    ([(header::SET_COOKIE, auth::clear_cookie())], Json(json!({ "ok": true }))).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct ChangePasswordBody {
+    current: String,
+    new: String,
+}
+
+pub async fn change_password(State(state): State<Arc<AppState>>, Json(body): Json<ChangePasswordBody>) -> ApiResult {
+    let mut config = state.config();
+    if !auth::verify_password(&config.web.password_hash, &body.current) {
+        return Err(ApiError(StatusCode::FORBIDDEN, "the current password is wrong".into()));
+    }
+    if body.new.chars().count() < auth::MIN_PASSWORD_LEN {
+        return Err(bad_request(format!("the password needs at least {} characters", auth::MIN_PASSWORD_LEN)));
+    }
+    config.web.password_hash = auth::hash_password(&body.new)?;
+    state.set_config(config.clone())?;
+    state.sessions.clear();
+    tracing::info!("web UI password changed");
+    Ok(login_response(&state, config.web.session_hours))
+}
+
+// ---- Status --------------------------------------------------------------------------------
+
+pub async fn status(State(state): State<Arc<AppState>>) -> Response {
+    Json(state.snapshot()).into_response()
+}
+
+pub async fn live(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(move |socket| stream_snapshots(state, socket))
+}
+
+async fn stream_snapshots(state: Arc<AppState>, mut socket: WebSocket) {
+    let mut updates = state.live.subscribe();
+    let send = |s: &crate::state::Snapshot| serde_json::to_string(s).map(|t| Message::Text(t.into()));
+    if let Ok(message) = send(&state.snapshot())
+        && socket.send(message).await.is_err()
+    {
+        return;
+    }
+    loop {
+        tokio::select! {
+            update = updates.recv() => match update {
+                Ok(snapshot) => {
+                    let Ok(message) = send(&snapshot) else { continue };
+                    if socket.send(message).await.is_err() {
+                        return;
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => return,
+            },
+            incoming = socket.recv() => match incoming {
+                Some(Ok(Message::Close(_))) | None | Some(Err(_)) => return,
+                _ => {}
+            },
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct EventsQuery {
+    #[serde(default)]
+    after: u64,
+}
+
+pub async fn events(State(state): State<Arc<AppState>>, Query(q): Query<EventsQuery>) -> Response {
+    Json(state.events.since(q.after)).into_response()
+}
+
+// ---- Configuration -------------------------------------------------------------------------
+
+pub async fn get_config(State(state): State<Arc<AppState>>) -> Response {
+    Json(state.config().redacted()).into_response()
+}
+
+pub async fn put_config(State(state): State<Arc<AppState>>, Json(incoming): Json<Config>) -> ApiResult {
+    let current = state.config();
+    let merged = current.merge_from_ui(incoming);
+    merged.validate().map_err(|e| bad_request(format!("{e:#}")))?;
+    if merged.web.listen != current.web.listen {
+        tracing::info!("web listen address changed to {}: restart the service to apply", merged.web.listen);
+    }
+    state.set_config(merged)?;
+    tracing::info!("configuration updated from the web UI");
+    Ok(Json(state.config().redacted()).into_response())
+}
+
+// ---- Manual control ------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct ManualBody {
+    /// `null` goes back to automatic control.
+    duty: Option<u8>,
+}
+
+pub async fn set_manual(
+    State(state): State<Arc<AppState>>,
+    Path(zone): Path<u8>,
+    Json(body): Json<ManualBody>,
+) -> ApiResult {
+    let config = state.config();
+    let Some(z) = config.zones.iter().find(|z| z.id == zone) else {
+        return Err(ApiError(StatusCode::NOT_FOUND, format!("unknown zone {zone}")));
+    };
+    match body.duty {
+        Some(duty) if duty > 100 => return Err(bad_request("duty must be between 0 and 100")),
+        Some(duty) => {
+            state.manual.lock().unwrap().insert(zone, duty);
+            tracing::info!("zone {}: manual duty {duty}%", z.name);
+        }
+        None => {
+            state.manual.lock().unwrap().remove(&zone);
+            tracing::info!("zone {}: back to automatic", z.name);
+        }
+    }
+    state.wake.notify_one();
+    Ok(Json(json!({ "ok": true })).into_response())
+}
+
+// ---- History -------------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct HistoryQuery {
+    /// Seconds back from now.
+    range: Option<u64>,
+    from: Option<u64>,
+    to: Option<u64>,
+    points: Option<u64>,
+    /// Comma separated key prefixes (`temp:,fan:`).
+    prefix: Option<String>,
+}
+
+pub async fn history(State(state): State<Arc<AppState>>, Query(q): Query<HistoryQuery>) -> ApiResult {
+    let Some(history) = state.history.clone() else {
+        return Err(ApiError(StatusCode::NOT_FOUND, "history is disabled".into()));
+    };
+    let to = q.to.unwrap_or_else(crate::now);
+    let from = q.from.unwrap_or_else(|| to.saturating_sub(q.range.unwrap_or(3600)));
+    let points = q.points.unwrap_or(600).clamp(10, 5000);
+    let prefixes: Vec<String> =
+        q.prefix.unwrap_or_default().split(',').map(str::trim).filter(|p| !p.is_empty()).map(String::from).collect();
+    let data = tokio::task::spawn_blocking(move || history.query(from, to, points, &prefixes))
+        .await
+        .map_err(|e| anyhow::anyhow!(e))??;
+    Ok(Json(data).into_response())
+}
+
+// ---- Notifications -------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct TestNotificationBody {
+    /// Index of a saved channel...
+    index: Option<usize>,
+    /// ...or a channel being edited (secrets may be placeholders).
+    channel: Option<NotificationChannel>,
+}
+
+pub async fn test_notification(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<TestNotificationBody>,
+) -> ApiResult {
+    let config = state.config();
+    let channel = match (body.channel, body.index) {
+        (Some(channel), index) => {
+            // Placeholders are resolved against the saved channel at the same index.
+            let mut incoming = config.redacted();
+            let slot = match index {
+                Some(i) if i < incoming.notifications.len() => {
+                    incoming.notifications[i] = channel;
+                    i
+                }
+                _ => {
+                    incoming.notifications.push(channel);
+                    incoming.notifications.len() - 1
+                }
+            };
+            config.merge_from_ui(incoming).notifications.swap_remove(slot)
+        }
+        (None, Some(i)) => config.notifications.get(i).cloned().ok_or_else(|| bad_request("unknown channel"))?,
+        (None, None) => return Err(bad_request("no channel given")),
+    };
+    let notification = Notification {
+        title: "Test".into(),
+        message: "Test notification from fan-control".into(),
+        severity: Severity::Info,
+    };
+    state.notifier.send(&channel, &notification).await.map_err(|e| bad_request(format!("{e:#}")))?;
+    Ok(Json(json!({ "ok": true })).into_response())
+}
