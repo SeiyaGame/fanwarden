@@ -1,0 +1,83 @@
+# Example configuration for fan-control.
+# Copy it to config.toml (next to the binary, or /data/config.toml in Docker), or start
+# without a file: a default one is created. Everything can then be changed from the web UI.
+# The web password is chosen on the first visit (password_hash stays empty here).
+
+notifications = []
+
+[general]
+interval_secs = 10
+dry_run = false
+failsafe_duty = 100
+reapply_secs = 300
+exit_fan_mode = "standard"
+
+[ipmi]
+target = "local"
+ipmitool_path = "ipmitool"
+timeout_secs = 10
+host = ""
+username = "ADMIN"
+password = ""
+interface = "lanplus"
+
+[disks]
+enabled = true
+smartctl_path = "smartctl"
+lsblk_path = "lsblk"
+interval_secs = 60
+exclude = "^(zram|loop|sr)"
+skip_standby = true
+
+[web]
+listen = "0.0.0.0:9495"
+password_hash = ""
+session_hours = 168
+metrics_enabled = true
+
+[history]
+enabled = true
+retention_days = 30
+
+[alerts]
+cpu_high = 85.0
+disk_high = 43.0
+nvme_high = 70.0
+disk_low = 20.0
+fan_min_rpm = 150
+ipmi_failures = 3
+repeat_minutes = 60
+notify_resolved = true
+
+[[zones]]
+id = 0
+name = "CPU"
+hysteresis = 3.0
+# Noctua fans: never below 20%
+min_duty = 20
+max_duty = 100
+
+[[zones.rules]]
+source = "cpu"
+curve = [
+    # Smoothed from the old steps (25/35/45/55/65/85/100 %): same average level,
+    # a little steeper as it gets hot, no jumps.
+    [25.0, 25], [35.0, 38], [45.0, 50], [55.0, 62], [65.0, 75], [75.0, 88], [82.0, 100],
+]
+
+[[zones]]
+id = 1
+name = "Peripheral"
+hysteresis = 1.0
+min_duty = 30
+max_duty = 100
+
+[[zones.rules]]
+source = "disks:hdd"
+curve = [
+    # Keep the hottest HDD at or below ~40°C: published field studies (Google 2007,
+    # Microsoft 2011/2013) see wear rise with heat, clearly so above ~45°C, while
+    # overcooling below ~25-30°C does not help either. Quiet up to 33°C, steep ramp
+    # from 38°C, full speed at 44°C.
+    [33.0, 40], [36.0, 50], [38.0, 60], [40.0, 75], [42.0, 88], [44.0, 100],
+]
