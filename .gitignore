@@ -6,3 +6,5 @@
 *.db-shm
 /config.toml
 /dev-config.toml
+/calibration.json
+/config-history.json
