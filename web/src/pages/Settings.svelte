@@ -1,8 +1,12 @@
 <script lang="ts">
   import { api } from '../lib/api'
   import { configStore } from '../lib/configStore.svelte'
+  import { parseNotes } from '../lib/releaseNotes'
+  import { updates } from '../lib/update.svelte'
 
   const config = $derived(configStore.draft)
+  const update = $derived(updates.status)
+  const notes = $derived(update?.latest ? parseNotes(update.latest.notes) : [])
 
   let current = $state('')
   let next = $state('')
@@ -55,6 +59,43 @@
   </header>
   {#if reloadMessage}
     <p class:error={!reloadMessage.ok} role="status">{reloadMessage.text}</p>
+  {/if}
+
+  {#if update}
+    <section class="panel" aria-labelledby="update-title">
+      <h2 id="update-title">
+        {update.available && update.latest ? `Version ${update.latest.version} is available` : 'Version'}
+      </h2>
+      <p>
+        This is fanwarden {update.current}{#if update.build}&nbsp;({update.build}){/if}.
+        {#if !update.enabled}
+          Checking for new versions is off.
+        {:else if update.error}
+          <span class="error">Cannot check for a new version: {update.error}</span>
+        {:else if update.checked && !update.available}
+          It is the latest release (checked {new Date(update.checked * 1000).toLocaleString()}).
+        {/if}
+      </p>
+      {#if update.available && update.latest}
+        {#each notes as section, i (i)}
+          <div class="notes">
+            {#if section.title}<h3>{section.title}</h3>{/if}
+            <ul>
+              {#each section.items as item, j (j)}<li>{item}</li>{/each}
+            </ul>
+          </div>
+        {/each}
+        <p><a href={update.latest.url} target="_blank" rel="noreferrer">Release page on GitHub</a></p>
+        <div class="how">
+          <p>To update, run the installer again with the folder fanwarden is installed in:</p>
+          <pre><code
+              >curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fanwarden/main/install.sh
+sudo bash install.sh --dir /opt/fanwarden</code
+            ></pre>
+          <p>With Docker: <code>docker compose pull && docker compose up -d</code>.</p>
+        </div>
+      {/if}
+    </section>
   {/if}
 
   {#if config}
@@ -210,6 +251,10 @@
         <label class="check"
           ><input type="checkbox" bind:checked={config.web.metrics_enabled} /> Publish Prometheus metrics on /metrics</label
         >
+        <label class="check"
+          ><input type="checkbox" bind:checked={config.general.check_updates} /> Check GitHub for a new version
+          twice a day</label
+        >
         <label class="field"
           >Web address (applies after a restart) <input bind:value={config.web.listen} /></label
         >
@@ -290,6 +335,33 @@
 
   .submit {
     align-self: end;
+  }
+
+  section.panel p,
+  .notes h3,
+  .notes ul {
+    margin: 0;
+  }
+
+  .notes h3 {
+    font-size: var(--step-0);
+  }
+
+  .notes ul {
+    padding-left: 1.2rem;
+  }
+
+  .how {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  pre {
+    margin: 0;
+    padding: 0.75rem;
+    overflow-x: auto;
+    background: var(--panel-sunk);
+    border-radius: var(--radius-s);
   }
 
   .error {

@@ -6,6 +6,7 @@ import type {
   LogEvent,
   NotificationChannel,
   Snapshot,
+  UpdateStatus,
 } from './types'
 
 export class ApiError extends Error {
@@ -64,6 +65,7 @@ export const api = {
   setManual: (zone: number, duty: number | null) => request('PUT', `/zones/${zone}/manual`, { duty }),
   startCalibration: (zone: number) => request('POST', `/zones/${zone}/calibration`),
   cancelCalibration: (zone: number) => request('DELETE', `/zones/${zone}/calibration`),
+  update: () => request<UpdateStatus>('GET', '/update'),
   bmcEvents: () => request<BmcLog>('GET', '/bmc/events'),
   events: (after = 0) => request<LogEvent[]>('GET', `/events?after=${after}`),
   history: (range: number, prefix: string, points = 600) =>

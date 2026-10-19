@@ -151,6 +151,8 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FANWARDEN_BUILD=${{ github.ref == 'refs/heads/main' && format('dev {0}', github.sha) || '' }}
           cache-from: type=gha
           # Only main and tags write the cache, PRs read it
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
@@ -188,7 +190,11 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - run: cargo build --release --locked --target x86_64-unknown-linux-musl
+      - name: Build
+        run: |
+          # The dev pre-release shows its commit in the web UI
+          if [ "$GITHUB_REF" = refs/heads/main ]; then export FANWARDEN_BUILD="dev ${GITHUB_SHA::7}"; fi
+          cargo build --release --locked --target x86_64-unknown-linux-musl
       - run: |
           cp target/x86_64-unknown-linux-musl/release/fanwarden fanwarden-x86_64-linux
           sha256sum fanwarden-x86_64-linux > fanwarden-x86_64-linux.sha256

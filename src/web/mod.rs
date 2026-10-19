@@ -36,6 +36,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/zones/{id}/calibration", post(api::start_calibration).delete(api::cancel_calibration))
         .route("/history", get(api::history))
         .route("/bmc/events", get(api::bmc_events))
+        .route("/update", get(api::update_status))
         .route("/notifications/test", post(api::test_notification))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_session));
 

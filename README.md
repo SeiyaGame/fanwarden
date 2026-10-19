@@ -27,6 +27,8 @@ that accepts the X10/X11/X12/H11/H12 fan commands (`raw 0x30 0x70 0x66`).
   hardware event, unreachable BMC) sent to Discord, ntfy, Gotify or any webhook.
 - Power draw of the server (IPMI DCMI, or the power supply sensors): on the overview, in the history and
   in the metrics.
+- New version notice: the web UI shows when a release is out, with its changelog and the command to
+  update (checks GitHub twice a day, can be turned off in Settings).
 - Prometheus metrics on `/metrics`.
 - Local BMC (`/dev/ipmi0`) or remote BMC over the network (IPMI over LAN).
 

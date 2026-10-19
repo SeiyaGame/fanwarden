@@ -13,7 +13,9 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY src ./src
 COPY --from=web /web/dist ./web/dist
-RUN cargo build --release --locked
+# Shown in the web UI of the dev builds, e.g. "dev d7693c8"
+ARG FANWARDEN_BUILD=""
+RUN FANWARDEN_BUILD="$FANWARDEN_BUILD" cargo build --release --locked
 
 # Runtime: the tools fanwarden calls
 FROM alpine:3.24

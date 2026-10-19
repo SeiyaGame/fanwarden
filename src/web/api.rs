@@ -169,6 +169,10 @@ pub async fn bmc_events(State(state): State<Arc<AppState>>) -> Response {
     Json(state.bmc_log()).into_response()
 }
 
+pub async fn update_status(State(state): State<Arc<AppState>>) -> Response {
+    Json(state.update_status()).into_response()
+}
+
 // ---- Configuration -------------------------------------------------------------------------
 
 pub async fn get_config(State(state): State<Arc<AppState>>) -> Response {

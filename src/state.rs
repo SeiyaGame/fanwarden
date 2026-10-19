@@ -20,6 +20,7 @@ use crate::ipmi::FanReading;
 use crate::notify::Notifier;
 use crate::sel::BmcLog;
 use crate::sensors::{SensorData, SourceOption};
+use crate::update::UpdateStatus;
 use crate::web::auth::Sessions;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -105,6 +106,7 @@ pub struct AppState {
     references: RwLock<BTreeMap<u8, Reference>>,
     pub config_history: ConfigHistory,
     bmc_log: RwLock<BmcLog>,
+    update_status: RwLock<UpdateStatus>,
 }
 
 impl AppState {
@@ -141,6 +143,7 @@ impl AppState {
             references: RwLock::new(references),
             config_history,
             bmc_log: RwLock::default(),
+            update_status: RwLock::default(),
         })
     }
 
@@ -193,6 +196,14 @@ impl AppState {
         let mut references = self.references.write().unwrap();
         references.insert(reference.zone, reference);
         calibration::save_references(&calibration::references_path(&self.config_path), &references)
+    }
+
+    pub fn update_status(&self) -> UpdateStatus {
+        self.update_status.read().unwrap().clone()
+    }
+
+    pub fn set_update_status(&self, status: UpdateStatus) {
+        *self.update_status.write().unwrap() = status;
     }
 
     pub fn config(&self) -> Config {

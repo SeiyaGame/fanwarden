@@ -262,6 +262,16 @@ async fn bmc_event_log() {
 }
 
 #[tokio::test]
+async fn update_status_before_the_first_check() {
+    let mut app = logged_in(Config::default()).await;
+    let (status, body, _) = app.call("GET", "/api/update", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["current"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(body["available"], false);
+    assert_eq!(body["latest"], Value::Null);
+}
+
+#[tokio::test]
 async fn calibration_is_refused_in_dry_run() {
     let mut config = Config::default();
     config.general.dry_run = true;

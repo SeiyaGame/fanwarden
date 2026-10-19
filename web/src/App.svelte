@@ -4,6 +4,7 @@
   import { api, setUnauthorizedHandler } from './lib/api'
   import { configStore } from './lib/configStore.svelte'
   import { live } from './lib/live.svelte'
+  import { updates } from './lib/update.svelte'
   import Alerts from './pages/Alerts.svelte'
   import Curves from './pages/Curves.svelte'
   import History from './pages/History.svelte'
@@ -40,7 +41,11 @@
     if (auth !== 'ok') return
     live.start()
     configStore.load()
-    return () => live.stop()
+    updates.start()
+    return () => {
+      live.stop()
+      updates.stop()
+    }
   })
 
   onMount(() => {
@@ -90,6 +95,9 @@
         {/each}
       </ul>
       <div class="status">
+        {#if updates.status?.available && updates.status.latest}
+          <a class="update" href="#/settings">Version {updates.status.latest.version} is available</a>
+        {/if}
         {#if snapshot?.simulate}<p class="flag">Simulated hardware</p>{/if}
         {#if snapshot?.dry_run}<p class="flag">Dry run: speeds are not applied</p>{/if}
         <p class="soft">
@@ -204,6 +212,13 @@
     display: grid;
     gap: 0.6rem;
     font-size: var(--step--1);
+  }
+
+  .update {
+    color: var(--ink);
+    font-weight: 600;
+    border-left: 3px solid var(--mild);
+    padding-left: 0.5rem;
   }
 
   .flag {

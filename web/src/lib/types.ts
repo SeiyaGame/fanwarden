@@ -154,6 +154,7 @@ export interface Config {
     failsafe_duty: number
     reapply_secs: number
     exit_fan_mode: FanMode
+    check_updates: boolean
   }
   ipmi: {
     target: 'local' | 'remote'
@@ -216,6 +217,17 @@ export interface BmcLog {
   entries: BmcEvent[]
   percent_used: number | null
   updated: number | null
+  error: string | null
+}
+
+export interface UpdateStatus {
+  current: string
+  /** Dev builds: e.g. "dev d7693c8". */
+  build: string | null
+  enabled: boolean
+  latest: { version: string; url: string; notes: string; published: string } | null
+  available: boolean
+  checked: number | null
   error: string | null
 }
 
