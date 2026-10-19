@@ -21,8 +21,10 @@ that accepts the X10/X11/X12/H11/H12 fan commands (`raw 0x30 0x70 0x66`).
 - Web UI: live overview, curve editor, history (SQLite), manual speed, alerts, settings, journal.
 - Configuration history: the last 20 versions with what changed in each (secrets hidden), and a
   button to go back to any of them (Journal page).
-- Alerts (hot CPU or disk, stopped or slowing fan, failing disk or SMART errors going up, unreachable
-  BMC) sent to Discord, ntfy, Gotify or any webhook.
+- BMC hardware event log (memory errors, power supplies, chassis intrusion, thresholds crossed) in the
+  Journal, with an alert for each new warning or failure.
+- Alerts (hot CPU or disk, stopped or slowing fan, failing disk or SMART errors going up, BMC
+  hardware event, unreachable BMC) sent to Discord, ntfy, Gotify or any webhook.
 - Prometheus metrics on `/metrics`.
 - Local BMC (`/dev/ipmi0`) or remote BMC over the network (IPMI over LAN).
 

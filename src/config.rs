@@ -140,6 +140,8 @@ pub struct Alerts {
     pub fan_slowdown_percent: Option<f32>,
     /// Failing disks, and SMART error counters going up.
     pub smart_health: bool,
+    /// New warnings and failures in the BMC event log (memory, power supplies, intrusion...).
+    pub bmc_events: bool,
     pub repeat_minutes: u64,
     pub notify_resolved: bool,
 }
@@ -322,6 +324,7 @@ impl Default for Alerts {
             ipmi_failures: 3,
             fan_slowdown_percent: Some(15.0),
             smart_health: true,
+            bmc_events: true,
             repeat_minutes: 60,
             notify_resolved: true,
         }

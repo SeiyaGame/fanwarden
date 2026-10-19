@@ -1,10 +1,11 @@
 <script lang="ts">
+  import BmcEvents from '../components/BmcEvents.svelte'
   import ConfigHistory from '../components/ConfigHistory.svelte'
   import { api } from '../lib/api'
   import type { LogEvent } from '../lib/types'
 
   let events = $state<LogEvent[]>([])
-  let view = $state<'events' | 'config'>('events')
+  let view = $state<'events' | 'bmc' | 'config'>('events')
   let filter = $state<'all' | 'problems'>('all')
   const shown = $derived((filter === 'all' ? events : events.filter((e) => e.level !== 'info')).toReversed())
 
@@ -36,6 +37,9 @@
         aria-pressed={view === 'events'}
         onclick={() => (view = 'events')}>Events</button
       >
+      <button class:quiet={view !== 'bmc'} aria-pressed={view === 'bmc'} onclick={() => (view = 'bmc')}
+        >BMC hardware log</button
+      >
       <button
         class:quiet={view !== 'config'}
         aria-pressed={view === 'config'}
@@ -58,16 +62,20 @@
       >
     </div>
 
-    <ol class="panel log">
-      {#each shown as event (event.id)}
-        <li data-level={event.level}>
-          <time class="soft figure">{time(event.ts)}</time>
-          <span>{event.message}</span>
-        </li>
-      {:else}
-        <li class="soft">Nothing recorded since the service started.</li>
-      {/each}
-    </ol>
+    {#if view === 'bmc'}
+      <BmcEvents {filter} />
+    {:else}
+      <ol class="panel log">
+        {#each shown as event (event.id)}
+          <li data-level={event.level}>
+            <time class="soft figure">{time(event.ts)}</time>
+            <span>{event.message}</span>
+          </li>
+        {:else}
+          <li class="soft">Nothing recorded since the service started.</li>
+        {/each}
+      </ol>
+    {/if}
   {/if}
 </div>
 

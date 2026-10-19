@@ -181,6 +181,7 @@ impl Controller {
         if self.sim.is_none() {
             tokio::spawn(disk_task(self.state.clone(), self.disks.clone(), shutdown.clone()));
         }
+        tokio::spawn(crate::sel::task(self.state.clone(), shutdown.clone()));
         loop {
             let config = self.state.config();
             self.iterate(&config).await;

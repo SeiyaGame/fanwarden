@@ -8,6 +8,8 @@ use serde::Serialize;
 use crate::config::{FanMode, Ipmi, IpmiTarget};
 use crate::exec;
 
+const SEL_LIST_TIMEOUT: Duration = Duration::from_secs(120);
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct FanReading {
     pub name: String,
@@ -67,9 +69,12 @@ impl IpmiTool {
     }
 
     async fn call(&self, args: &[&str]) -> anyhow::Result<String> {
+        self.call_within(args, Duration::from_secs(self.config.timeout_secs.max(1))).await
+    }
+
+    async fn call_within(&self, args: &[&str], timeout: Duration) -> anyhow::Result<String> {
         let mut all = self.base_args();
         all.extend(args.iter().map(|a| a.to_string()));
-        let timeout = Duration::from_secs(self.config.timeout_secs.max(1));
         exec::run_ok(&self.config.ipmitool_path, &all, &self.envs(), timeout).await
     }
 
@@ -105,6 +110,15 @@ impl IpmiTool {
 
     pub async fn read_sdr(&self) -> anyhow::Result<SdrReadings> {
         Ok(parse_sdr(&self.call(&["sdr"]).await?))
+    }
+
+    pub async fn sel_info(&self) -> anyhow::Result<String> {
+        self.call(&["sel", "info"]).await
+    }
+
+    /// The whole event log. `elist` looks up sensor names: slow on a full log over the network.
+    pub async fn sel_list(&self) -> anyhow::Result<String> {
+        self.call_within(&["sel", "elist"], SEL_LIST_TIMEOUT).await
     }
 
     /// Synchronous variant of [`set_fan_mode`], usable from a panic hook.
