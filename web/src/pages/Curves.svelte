@@ -198,7 +198,7 @@
         </div>
       </section>
     {/each}
-    <div><button class="btn" onclick={addZone}>Add a zone</button></div>
+    <div><button class="btn btn-dash btn-primary" onclick={addZone}>+ Add a zone</button></div>
   {:else}
     <p class="flex items-center gap-2 text-base-content/60">
       <span class="loading loading-spinner loading-sm"></span> Loading…

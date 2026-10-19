@@ -90,7 +90,7 @@
 
   {#if reference && !runningHere}
     {#if reference.bmc_takeover !== null}
-      <div role="alert" class="alert alert-warning alert-soft grid-cols-1 items-start justify-items-stretch">
+      <div role="alert" class="grid gap-2 rounded-box border border-warning/60 bg-warning/10 p-4">
         <p>
           The BMC raised the fans to full speed at {reference.bmc_takeover}%: a fan went under one of its
           lower RPM thresholds, so the sweep stopped there. Check them with

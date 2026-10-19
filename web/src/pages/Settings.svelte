@@ -51,7 +51,7 @@
   <header class="flex flex-wrap items-start justify-between gap-4">
     <h1 class="text-2xl font-semibold">Settings</h1>
     <div class="grid justify-items-start gap-1 text-sm sm:justify-items-end">
-      <button class="btn btn-sm" onclick={reload} disabled={reloading}>
+      <button class="btn btn-outline btn-sm" onclick={reload} disabled={reloading}>
         {#if reloading}<span class="loading loading-spinner loading-xs"></span>{/if}
         {configStore.dirty ? 'Discard my changes and reload the file' : 'Reload the configuration file'}
       </button>

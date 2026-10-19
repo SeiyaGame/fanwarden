@@ -47,12 +47,12 @@
   {:else}
     <div role="group" aria-label="Filter" class="join">
       <button
-        class="btn join-item btn-sm {filter === 'all' ? 'btn-primary' : ''}"
+        class="btn join-item btn-sm {filter === 'all' ? 'btn-primary' : 'bg-base-100'}"
         aria-pressed={filter === 'all'}
         onclick={() => (filter = 'all')}>Everything</button
       >
       <button
-        class="btn join-item btn-sm {filter === 'problems' ? 'btn-primary' : ''}"
+        class="btn join-item btn-sm {filter === 'problems' ? 'btn-primary' : 'bg-base-100'}"
         aria-pressed={filter === 'problems'}
         onclick={() => (filter = 'problems')}>Warnings and errors</button
       >
