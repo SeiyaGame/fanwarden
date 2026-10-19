@@ -1,0 +1,75 @@
+# Weekly dependency updates. Minor and patch bumps are grouped into one PR per ecosystem
+# and merged automatically once the CI passes (dependabot-automerge.yml); majors get their
+# own PR and wait for a review.
+# Commit prefixes follow the conventional commits used by git-cliff (cliff.toml).
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    # Leave new releases a few days to get yanked before picking them up
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      rust:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      web:
+        update-types: [minor, patch]
+    ignore:
+      # Follows the Node major used by the CI and the Dockerfile
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      docker:
+        update-types: [minor, patch]
+    ignore:
+      # Node major changes are done by hand, together with the CI
+      - dependency-name: node
+        update-types: [version-update:semver-major]

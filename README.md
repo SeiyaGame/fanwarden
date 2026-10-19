@@ -124,6 +124,11 @@ scripts/check.sh                      # fmt, clippy, tests, eslint, prettier, sv
 
 On Windows, the hook runs the Rust checks inside WSL when `cargo` is not on the Windows `PATH`.
 
+The CI also checks the minimum Rust version (`rust-version`), the licenses and sources of the crates
+(`cargo deny check`, see `deny.toml`), the security advisories, the workflows (actionlint) and that the
+Docker image builds. Dependabot opens weekly updates (crates, npm, actions, base images): minor and
+patch updates are merged automatically once the CI passes, majors wait for a review.
+
 ### Layout
 
 ```
