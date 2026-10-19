@@ -29,6 +29,8 @@ const STABLE_DUTY_FOR: Duration = Duration::from_secs(30);
 const SLOW_CYCLES: u32 = 3;
 /// Fans stopped by a calibration need a moment to spin up again: no "stopped fan" alert meanwhile.
 const FAN_ALERT_GRACE: Duration = Duration::from_secs(30);
+/// A BMC without DCMI power readings is asked again after this long.
+const DCMI_RETRY: Duration = Duration::from_secs(3600);
 
 /// What a rule remembers between two cycles.
 #[derive(Debug, Clone, Default)]
@@ -144,6 +146,8 @@ pub struct Controller {
     stable: HashMap<u8, (u8, Instant)>,
     /// Consecutive cycles each fan was found slower than its calibration.
     slow_counts: HashMap<String, u32>,
+    /// DCMI power readings failed: when to try them again.
+    dcmi_retry: Option<Instant>,
 }
 
 impl Controller {
@@ -174,6 +178,7 @@ impl Controller {
             calibration_ended: None,
             stable: HashMap::new(),
             slow_counts: HashMap::new(),
+            dcmi_retry: None,
         }
     }
 
@@ -236,6 +241,7 @@ impl Controller {
         }
 
         let data = self.read_sensors(config, &sdr);
+        let power_watts = self.read_power(&sdr).await;
         let dt = self
             .last_cycle
             .map_or(config.general.interval_secs as f32, |t| t.elapsed().as_secs_f32())
@@ -294,7 +300,7 @@ impl Controller {
             });
         }
 
-        self.record_history(config, now, &data, &sdr, &zones).await;
+        self.record_history(config, now, &data, &sdr, &zones, power_watts).await;
 
         self.state.publish(Snapshot {
             ts: now,
@@ -306,6 +312,7 @@ impl Controller {
             sources: sensors::available_sources(&data),
             sensors: data,
             fans: sdr.fans,
+            power_watts,
             zones,
             alerts: self.alerts.active(),
             calibration: self.state.calibration(),
@@ -343,6 +350,26 @@ impl Controller {
             *self.slow_counts.entry(fan.name.clone()).or_default() += 1;
         }
         found.into_iter().filter(|f| self.slow_counts[&f.name] >= SLOW_CYCLES).collect()
+    }
+
+    /// Power draw: DCMI, else the power supply sensors of the SDR.
+    async fn read_power(&mut self, sdr: &SdrReadings) -> Option<f32> {
+        if self.bmc_failures == 0 && self.dcmi_retry.is_none_or(|t| Instant::now() >= t) {
+            match self.bmc.power_reading().await {
+                Ok(Some(watts)) => {
+                    self.dcmi_retry = None;
+                    return Some(watts);
+                }
+                outcome => {
+                    if self.dcmi_retry.is_none() {
+                        let why = outcome.err().map_or("readings turned off in the BMC".into(), |e| format!("{e:#}"));
+                        tracing::info!("no DCMI power reading ({why}), using the power supply sensors if any");
+                    }
+                    self.dcmi_retry = Some(Instant::now() + DCMI_RETRY);
+                }
+            }
+        }
+        sdr.input_watts
     }
 
     fn read_sensors(&self, config: &Config, sdr: &SdrReadings) -> SensorData {
@@ -442,6 +469,7 @@ impl Controller {
         data: &SensorData,
         sdr: &SdrReadings,
         zones: &[ZoneStatus],
+        power_watts: Option<f32>,
     ) {
         let Some(history) = self.state.history.clone() else {
             return;
@@ -472,6 +500,9 @@ impl Controller {
             if let Some(duty) = zone.duty {
                 values.push((format!("duty:{}", zone.id), duty as f32));
             }
+        }
+        if let Some(watts) = power_watts {
+            values.push(("power".into(), watts));
         }
         let prune_before = self
             .last_prune

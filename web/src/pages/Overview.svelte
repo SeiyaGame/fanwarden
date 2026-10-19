@@ -64,8 +64,14 @@
       </section>
 
       <section class="panel" aria-labelledby="sensors-title">
-        <h2 id="sensors-title">Temperatures</h2>
+        <h2 id="sensors-title">{s.power_watts === null ? 'Temperatures' : 'Temperatures and power'}</h2>
         <dl class="temps">
+          {#if s.power_watts !== null}
+            <div>
+              <dt>Power draw</dt>
+              <dd class="figure">{Math.round(s.power_watts)} W</dd>
+            </div>
+          {/if}
           <div>
             <dt>CPU package</dt>
             <dd class="figure">

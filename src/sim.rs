@@ -90,7 +90,14 @@ impl Simulator {
                 temp("System Temp", 29.0 + (self.t() / 300.0).sin() * 2.0),
                 temp("Peripheral Temp", 36.0 - (periph_duty - 50.0) * 0.05),
             ],
+            input_watts: None,
         }
+    }
+
+    /// Watts: idle board and disks, CPU load, and fans that draw more at high speed.
+    pub fn power(&self) -> f32 {
+        let fans = (self.duty(0) / 100.0).powi(3) * 18.0 + (self.duty(1) / 100.0).powi(3) * 24.0;
+        (95.0 + (self.cpu() - 35.0).max(0.0) * 2.2 + fans).round()
     }
 
     /// Temperature a drive settles at with the current airflow: ~1°C less per 5% of duty.

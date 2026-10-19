@@ -13,21 +13,26 @@
   ]
 
   let range = $state(3600)
-  let data = $state<{ temps: HistoryData; disks: HistoryData; duty: HistoryData; fans: HistoryData } | null>(
-    null,
-  )
+  let data = $state<{
+    temps: HistoryData
+    disks: HistoryData
+    duty: HistoryData
+    fans: HistoryData
+    power: HistoryData
+  } | null>(null)
   let error = $state<string | null>(null)
 
   async function load(seconds: number) {
     error = null
     try {
-      const [temps, disks, duty, fans] = await Promise.all([
+      const [temps, disks, duty, fans, power] = await Promise.all([
         api.history(seconds, 'temp:cpu,temp:ipmi:'),
         api.history(seconds, 'temp:disk:'),
         api.history(seconds, 'duty:'),
         api.history(seconds, 'fan:'),
+        api.history(seconds, 'power'),
       ])
-      data = { temps, disks, duty, fans }
+      data = { temps, disks, duty, fans, power }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
     }
@@ -45,6 +50,7 @@
       const id = Number(key.slice(5))
       return live.snapshot?.zones.find((z) => z.id === id)?.name ?? `Zone ${id}`
     }
+    if (key === 'power') return 'Power draw'
     return key.replace(/^fan:/, '')
   }
 </script>
@@ -88,6 +94,12 @@
       <h2>Fans</h2>
       <Chart data={data.fans} {label} unit=" rpm" />
     </section>
+    {#if data.power.series.length}
+      <section class="panel">
+        <h2>Power</h2>
+        <Chart data={data.power} {label} unit=" W" />
+      </section>
+    {/if}
   {/if}
 </div>
 
