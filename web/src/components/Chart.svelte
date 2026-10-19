@@ -64,27 +64,7 @@
   onDestroy(() => plot?.destroy())
 </script>
 
-<div class="chart" bind:this={host}></div>
-
-<style>
-  .chart {
-    width: 100%;
-    min-height: 300px;
-  }
-
-  .chart :global(.u-legend) {
-    font-family: var(--font);
-    font-size: var(--step--1);
-    color: var(--ink);
-    text-align: left;
-  }
-
-  .chart :global(.u-legend .u-value) {
-    font-family: var(--font-figures);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .chart :global(.u-select) {
-    background: color-mix(in srgb, var(--focus) 15%, transparent);
-  }
-</style>
+<div
+  class="min-h-75 w-full [&_.u-legend]:text-left [&_.u-legend]:text-sm [&_.u-select]:bg-info/15 [&_.u-value]:font-figures [&_.u-value]:tabular-nums"
+  bind:this={host}
+></div>

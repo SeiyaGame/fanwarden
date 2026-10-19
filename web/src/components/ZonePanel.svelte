@@ -20,6 +20,14 @@
   let editing = $state(false)
   let error = $state<string | null>(null)
 
+  const modeBadge = {
+    auto: 'badge-success',
+    manual: 'badge-info',
+    failsafe: 'badge-error',
+    unmanaged: 'badge-ghost',
+    calibrating: 'badge-warning',
+  } as const
+
   const modeText = {
     auto: 'Automatic',
     manual: 'Manual',
@@ -39,205 +47,93 @@
   }
 </script>
 
-<section class="zone panel" data-mode={zone.mode} aria-labelledby="zone-{zone.id}">
-  <header>
-    <h2 id="zone-{zone.id}">{zone.name}</h2>
-    <span class="mode">{modeText[zone.mode]}</span>
-  </header>
+<section class="card border border-base-300 bg-base-100" aria-labelledby="zone-{zone.id}">
+  <div class="card-body gap-4">
+    <header class="flex flex-wrap items-center justify-between gap-2">
+      <h2 id="zone-{zone.id}" class="card-title">{zone.name}</h2>
+      <span class="badge badge-soft {modeBadge[zone.mode]}">{modeText[zone.mode]}</span>
+    </header>
 
-  <div class="readout">
-    <Rotor {rpm} size={76} />
-    <div>
-      <div class="duty figure">{zone.duty ?? '—'}<small>%</small></div>
-      <div class="soft">{rpm ? `${rpm} RPM` : 'no fan reading'}</div>
+    <div class="flex items-center gap-5">
+      <Rotor {rpm} size={76} />
+      <div>
+        <div class="font-figures text-5xl leading-none font-semibold tabular-nums">
+          {zone.duty ?? '—'}<span class="text-2xl text-base-content/50">%</span>
+        </div>
+        <div class="text-base-content/60">{rpm ? `${rpm} RPM` : 'no fan reading'}</div>
+      </div>
     </div>
-  </div>
 
-  {#if zone.rules.length}
-    <ul class="rules">
-      {#each zone.rules as rule, i (i)}
-        <li class:driving={rule === driver}>
-          <span
-            class="swatch"
-            style:background={thermalColor(rule.temperature, probeForSource(rule.source))}
-            aria-hidden="true"
-          ></span>
-          <span class="label"
-            >{sourceLabel(rule.source)}
-            {#if rule.target !== null}
-              <small class:over={rule.emergency}
-                >{rule.emergency ? 'far above target' : 'target'} {rule.target}°</small
-              >
-            {/if}
-          </span>
-          <span class="figure">
-            {#if rule.state === 'ok'}{rule.temperature}°C
-            {:else if rule.state === 'idle'}<span class="soft">asleep</span>
-            {:else}<span class="missing">missing</span>{/if}
-          </span>
-          <span class="figure soft">{rule.duty}%</span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+    {#if zone.rules.length}
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Source</th><th class="text-right">Temp.</th><th class="text-right">Asks</th></tr>
+        </thead>
+        <tbody>
+          {#each zone.rules as rule, i (i)}
+            <tr class={rule === driver ? 'bg-base-200 font-semibold' : ''}>
+              <td>
+                <span
+                  class="status mr-1.5"
+                  style:background-color={thermalColor(rule.temperature, probeForSource(rule.source))}
+                ></span>
+                {sourceLabel(rule.source)}
+                {#if rule.target !== null}
+                  <span class="badge badge-xs ml-1 {rule.emergency ? 'badge-error' : 'badge-ghost'}"
+                    >{rule.emergency ? 'far above target' : 'target'} {rule.target}°</span
+                  >
+                {/if}
+              </td>
+              <td class="text-right font-figures tabular-nums">
+                {#if rule.state === 'ok'}{rule.temperature}°C
+                {:else if rule.state === 'idle'}<span class="text-base-content/60">asleep</span>
+                {:else}<span class="text-error">missing</span>{/if}
+              </td>
+              <td class="text-right font-figures text-base-content/70 tabular-nums">{rule.duty}%</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
 
-  <footer>
-    {#if zone.mode === 'calibrating'}
-      <p class="soft">Calibration in progress: see the Curves page.</p>
-    {:else}
-      {#if zone.mode === 'manual'}
-        <button class="quiet" onclick={() => setManual(null)}>Return to automatic</button>
-      {/if}
-      {#if editing}
+    <footer class="card-actions items-center">
+      {#if zone.mode === 'calibrating'}
+        <p class="text-base-content/60">Calibration in progress: see the Curves page.</p>
+      {:else if editing}
         <form
-          class="manual"
+          class="flex w-full flex-wrap items-center gap-3"
           onsubmit={(e) => {
             e.preventDefault()
             setManual(manualDuty)
           }}
         >
-          <label class="visually-hidden" for="duty-{zone.id}">Fan speed for {zone.name}</label>
-          <input id="duty-{zone.id}" type="range" min="0" max="100" step="1" bind:value={manualDuty} />
-          <span class="figure">{manualDuty}%</span>
-          <button type="submit">Apply</button>
-          <button type="button" class="quiet" onclick={() => (editing = false)}>Cancel</button>
+          <label class="sr-only" for="duty-{zone.id}">Fan speed for {zone.name}</label>
+          <input
+            id="duty-{zone.id}"
+            class="range range-sm min-w-40 flex-1"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            bind:value={manualDuty}
+          />
+          <span class="w-12 text-right font-figures font-semibold tabular-nums">{manualDuty}%</span>
+          <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)}>Cancel</button>
         </form>
       {:else}
+        {#if zone.mode === 'manual'}
+          <button class="btn btn-sm" onclick={() => setManual(null)}>Return to automatic</button>
+        {/if}
         <button
-          class="quiet"
+          class="btn btn-sm"
           onclick={() => {
             manualDuty = zone.duty ?? 60
             editing = true
           }}>Set speed manually</button
         >
       {/if}
-    {/if}
-    {#if error}<p class="missing">{error}</p>{/if}
-  </footer>
+      {#if error}<p class="w-full text-error">{error}</p>{/if}
+    </footer>
+  </div>
 </section>
-
-<style>
-  .zone {
-    display: grid;
-    gap: 1rem;
-    align-content: start;
-  }
-
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .mode {
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-  }
-
-  [data-mode='manual'] .mode,
-  [data-mode='calibrating'] .mode {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  [data-mode='failsafe'] {
-    border-color: var(--critical);
-  }
-
-  [data-mode='failsafe'] .mode {
-    color: var(--critical);
-    font-weight: 600;
-  }
-
-  .readout {
-    display: flex;
-    align-items: center;
-    gap: 1.1rem;
-  }
-
-  .duty {
-    font-size: var(--step-4);
-    line-height: 0.95;
-    letter-spacing: -0.01em;
-  }
-
-  .duty small {
-    font-size: 0.45em;
-    margin-left: 0.08em;
-    color: var(--ink-soft);
-  }
-
-  .rules {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.35rem;
-  }
-
-  .rules li {
-    display: grid;
-    grid-template-columns: 0.6rem 1fr auto 3.2rem;
-    align-items: center;
-    gap: 0.6rem;
-    color: var(--ink-soft);
-  }
-
-  .rules li.driving {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .rules .figure {
-    text-align: right;
-  }
-
-  .swatch {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 2px;
-  }
-
-  .label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .label small {
-    font-weight: 400;
-    color: var(--ink-soft);
-    margin-left: 0.3rem;
-  }
-
-  .label small.over {
-    color: var(--critical);
-    font-weight: 600;
-  }
-
-  .missing {
-    color: var(--critical);
-  }
-
-  footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .manual {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
-    width: 100%;
-  }
-
-  .manual input {
-    flex: 1 1 140px;
-  }
-</style>

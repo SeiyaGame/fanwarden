@@ -28,63 +28,48 @@
   }
 </script>
 
-<main class="login">
-  <form class="panel" onsubmit={submit}>
-    <div class="brand">
-      <Rotor rpm={setup ? 900 : 500} size={44} color="var(--warm)" />
-      <h1>Fanwarden</h1>
-    </div>
-    {#if setup}
-      <p class="soft">Choose the password that protects this page. It needs at least 8 characters.</p>
-    {/if}
-    <label class="field"
-      >Password
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        type="password"
-        bind:value={password}
-        autocomplete={setup ? 'new-password' : 'current-password'}
-        minlength={setup ? 8 : undefined}
-        required
-        autofocus
-      /></label
-    >
-    {#if setup}
-      <label class="field"
-        >Password again <input
+<main class="grid min-h-dvh place-items-center bg-base-200 p-4">
+  <form class="card w-full max-w-sm border border-base-300 bg-base-100" onsubmit={submit}>
+    <div class="card-body gap-4">
+      <div class="flex items-center gap-3">
+        <Rotor rpm={setup ? 900 : 500} size={44} color="var(--color-accent)" />
+        <h1 class="text-2xl font-semibold">Fanwarden</h1>
+      </div>
+      {#if setup}
+        <p class="text-base-content/70">
+          Choose the password that protects this page. It needs at least 8 characters.
+        </p>
+      {/if}
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Password</legend>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          class="input w-full"
           type="password"
-          bind:value={confirm}
-          autocomplete="new-password"
+          bind:value={password}
+          autocomplete={setup ? 'new-password' : 'current-password'}
+          minlength={setup ? 8 : undefined}
+          aria-label="Password"
           required
-        /></label
-      >
-    {/if}
-    {#if error}<p class="error" role="alert">{error}</p>{/if}
-    <button type="submit" disabled={busy}>{setup ? 'Create password' : 'Sign in'}</button>
+          autofocus
+        />
+        {#if setup}
+          <legend class="fieldset-legend">Password again</legend>
+          <input
+            class="input w-full"
+            type="password"
+            bind:value={confirm}
+            autocomplete="new-password"
+            aria-label="Password again"
+            required
+          />
+        {/if}
+      </fieldset>
+      {#if error}<div role="alert" class="alert alert-error alert-soft">{error}</div>{/if}
+      <button class="btn btn-primary" type="submit" disabled={busy}>
+        {#if busy}<span class="loading loading-spinner loading-sm"></span>{/if}
+        {setup ? 'Create password' : 'Sign in'}
+      </button>
+    </div>
   </form>
 </main>
-
-<style>
-  .login {
-    min-height: 100dvh;
-    display: grid;
-    place-items: center;
-    padding: var(--gutter);
-  }
-
-  form {
-    width: min(100%, 360px);
-    display: grid;
-    gap: 1rem;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .error {
-    color: var(--critical);
-  }
-</style>

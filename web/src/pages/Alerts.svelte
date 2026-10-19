@@ -47,157 +47,168 @@
   const since = (ts: number) => new Date(ts * 1000).toLocaleString()
 </script>
 
-<div class="page">
-  <h1>Alerts</h1>
+<div class="grid gap-6">
+  <h1 class="text-2xl font-semibold">Alerts</h1>
 
-  <section class="panel" aria-labelledby="active-title">
-    <h2 id="active-title">Active now</h2>
-    {#each active as alert (alert.key)}
-      <p class="alert" data-severity={alert.severity}>
-        {alert.message} <span class="soft">since {since(alert.since)}</span>
-      </p>
-    {:else}
-      <p class="soft">Nothing to report.</p>
-    {/each}
+  <section class="card border border-base-300 bg-base-100" aria-labelledby="active-title">
+    <div class="card-body">
+      <h2 id="active-title" class="card-title">Active now</h2>
+      {#each active as alert (alert.key)}
+        <div
+          role="alert"
+          class="alert alert-soft {alert.severity === 'critical' ? 'alert-error' : 'alert-warning'}"
+        >
+          <span>{alert.message}</span>
+          <span class="text-sm opacity-70">since {since(alert.since)}</span>
+        </div>
+      {:else}
+        <p class="flex items-center gap-2 text-base-content/70">
+          <span class="status status-success"></span> Nothing to report.
+        </p>
+      {/each}
+    </div>
   </section>
 
   {#if config}
-    <section class="panel" aria-labelledby="rules-title">
-      <h2 id="rules-title">When to alert</h2>
-      <div class="grid-fields">
-        <OptionalNumber bind:value={config.alerts.cpu_high} label="CPU above" unit="°C" fallback={85} />
-        <OptionalNumber
-          bind:value={config.alerts.disk_high}
-          label="HDD or SSD above"
-          unit="°C"
-          fallback={45}
-        />
-        <OptionalNumber bind:value={config.alerts.nvme_high} label="NVMe above" unit="°C" fallback={70} />
-        <OptionalNumber bind:value={config.alerts.disk_low} label="Disk below" unit="°C" fallback={10} />
-        <OptionalNumber bind:value={config.alerts.fan_min_rpm} label="Fan below" unit="RPM" fallback={150} />
-        <OptionalNumber
-          bind:value={config.alerts.fan_slowdown_percent}
-          label="Fan slower than at its calibration by"
-          unit="%"
-          fallback={15}
-        />
-        <label class="field"
-          >BMC unreachable after (failed commands)
-          <input type="number" min="0" bind:value={config.alerts.ipmi_failures} /></label
-        >
-        <label class="field"
-          >Repeat an alert every (minutes, 0 = never)
-          <input type="number" min="0" bind:value={config.alerts.repeat_minutes} /></label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.alerts.smart_health} /> Disk failing, or its SMART error
-          counters going up</label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.alerts.bmc_events} /> New warning or failure in the BMC log</label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.alerts.notify_resolved} /> Notify when an alert clears</label
-        >
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="rules-title">
+      <div class="card-body gap-4">
+        <h2 id="rules-title" class="card-title">When to alert</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6 gap-y-4">
+          <OptionalNumber bind:value={config.alerts.cpu_high} label="CPU above" unit="°C" fallback={85} />
+          <OptionalNumber
+            bind:value={config.alerts.disk_high}
+            label="HDD or SSD above"
+            unit="°C"
+            fallback={45}
+          />
+          <OptionalNumber bind:value={config.alerts.nvme_high} label="NVMe above" unit="°C" fallback={70} />
+          <OptionalNumber bind:value={config.alerts.disk_low} label="Disk below" unit="°C" fallback={10} />
+          <OptionalNumber
+            bind:value={config.alerts.fan_min_rpm}
+            label="Fan below"
+            unit="RPM"
+            fallback={150}
+          />
+          <OptionalNumber
+            bind:value={config.alerts.fan_slowdown_percent}
+            label="Fan slower than at its calibration by"
+            unit="%"
+            fallback={15}
+          />
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">BMC unreachable after (failed commands)</legend>
+            <input class="input w-full" type="number" min="0" bind:value={config.alerts.ipmi_failures} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Repeat an alert every (minutes, 0 = never)</legend>
+            <input class="input w-full" type="number" min="0" bind:value={config.alerts.repeat_minutes} />
+          </fieldset>
+        </div>
+        <div class="grid gap-3">
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.alerts.smart_health}
+            />
+            Disk failing, or its SMART error counters going up</label
+          >
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.alerts.bmc_events}
+            />
+            New warning or failure in the BMC log</label
+          >
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.alerts.notify_resolved}
+            /> Notify when an alert clears</label
+          >
+        </div>
+        <p class="text-sm text-base-content/60">
+          A zone running at failsafe speed and a disk that cannot be read always raise an alert.
+        </p>
       </div>
-      <p class="soft">
-        A zone running at failsafe speed and a disk that cannot be read always raise an alert.
-      </p>
     </section>
 
-    <section class="panel" aria-labelledby="channels-title">
-      <h2 id="channels-title">Where to send them</h2>
-      {#each config.notifications as channel, i (i)}
-        <div class="channel">
-          <div class="channel-head">
-            <label class="check"
-              ><input type="checkbox" bind:checked={channel.enabled} />
-              <strong>{KINDS.find((k) => k.type === channel.type)?.label}</strong></label
-            >
-            <div class="actions">
-              <button class="quiet" onclick={() => test(channel, i)}>Send a test</button>
-              <button class="danger" onclick={() => config.notifications.splice(i, 1)}>Remove</button>
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="channels-title">
+      <div class="card-body gap-4">
+        <h2 id="channels-title" class="card-title">Where to send them</h2>
+        {#each config.notifications as channel, i (i)}
+          <div class="grid gap-2 rounded-box border border-base-300 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <label class="label cursor-pointer gap-3 text-base-content"
+                ><input
+                  type="checkbox"
+                  class="toggle toggle-sm toggle-success"
+                  bind:checked={channel.enabled}
+                />
+                <strong>{KINDS.find((k) => k.type === channel.type)?.label}</strong></label
+              >
+              <div class="flex flex-wrap gap-2">
+                <button class="btn btn-sm" onclick={() => test(channel, i)}>Send a test</button>
+                <button
+                  class="btn btn-sm btn-error btn-outline"
+                  onclick={() => config.notifications.splice(i, 1)}>Remove</button
+                >
+              </div>
             </div>
+            <div class="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-4">
+              {#if channel.type === 'discord' || channel.type === 'webhook'}
+                <fieldset class="fieldset col-span-full">
+                  <legend class="fieldset-legend">URL</legend>
+                  <input
+                    class="input w-full"
+                    bind:value={channel.url}
+                    placeholder="https://…"
+                    autocomplete="off"
+                  />
+                </fieldset>
+              {:else if channel.type === 'ntfy'}
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Server</legend>
+                  <input class="input w-full" bind:value={channel.server} />
+                </fieldset>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Topic</legend>
+                  <input class="input w-full" bind:value={channel.topic} />
+                </fieldset>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Access token (optional)</legend>
+                  <input class="input w-full" bind:value={channel.token} autocomplete="off" />
+                </fieldset>
+              {:else if channel.type === 'gotify'}
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Server</legend>
+                  <input class="input w-full" bind:value={channel.server} placeholder="https://…" />
+                </fieldset>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Application token</legend>
+                  <input class="input w-full" bind:value={channel.token} autocomplete="off" />
+                </fieldset>
+              {/if}
+            </div>
+            {#if testResult[i]}<p class="text-sm text-base-content/70">{testResult[i]}</p>{/if}
           </div>
-          <div class="grid-fields">
-            {#if channel.type === 'discord' || channel.type === 'webhook'}
-              <label class="field wide"
-                >URL <input bind:value={channel.url} placeholder="https://…" autocomplete="off" /></label
-              >
-            {:else if channel.type === 'ntfy'}
-              <label class="field">Server <input bind:value={channel.server} /></label>
-              <label class="field">Topic <input bind:value={channel.topic} /></label>
-              <label class="field"
-                >Access token (optional) <input bind:value={channel.token} autocomplete="off" /></label
-              >
-            {:else if channel.type === 'gotify'}
-              <label class="field">Server <input bind:value={channel.server} placeholder="https://…" /></label
-              >
-              <label class="field"
-                >Application token <input bind:value={channel.token} autocomplete="off" /></label
-              >
-            {/if}
-          </div>
-          {#if testResult[i]}<p class="soft">{testResult[i]}</p>{/if}
+        {:else}
+          <p class="text-base-content/60">No destination yet: alerts only appear here and in the journal.</p>
+        {/each}
+        <div class="join">
+          <label class="sr-only" for="new-kind">Destination type</label>
+          <select id="new-kind" class="select join-item w-48" bind:value={newKind}>
+            {#each KINDS as k (k.type)}<option value={k.type}>{k.label}</option>{/each}
+          </select>
+          <button class="btn join-item" onclick={() => config.notifications.push(blank(newKind))}
+            >Add destination</button
+          >
         </div>
-      {:else}
-        <p class="soft">No destination yet: alerts only appear here and in the journal.</p>
-      {/each}
-      <div class="add">
-        <label class="visually-hidden" for="new-kind">Destination type</label>
-        <select id="new-kind" bind:value={newKind}>
-          {#each KINDS as k (k.type)}<option value={k.type}>{k.label}</option>{/each}
-        </select>
-        <button class="quiet" onclick={() => config.notifications.push(blank(newKind))}
-          >Add destination</button
-        >
       </div>
     </section>
   {/if}
 </div>
-
-<style>
-  .page {
-    display: grid;
-    gap: var(--gutter);
-  }
-
-  section.panel {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .alert {
-    border-left: 4px solid var(--warm);
-    padding-left: 0.75rem;
-  }
-
-  .alert[data-severity='critical'] {
-    border-left-color: var(--critical);
-  }
-
-  .channel {
-    display: grid;
-    gap: 0.75rem;
-    border-top: 1px solid var(--rule);
-    padding-top: 1rem;
-  }
-
-  .channel-head {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
-  .actions,
-  .add {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .wide {
-    grid-column: 1 / -1;
-  }
-</style>

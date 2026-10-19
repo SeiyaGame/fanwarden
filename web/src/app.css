@@ -1,217 +1,88 @@
-/* Palette: brushed chassis metal for surfaces, a thermal scale reserved for readings. */
-:root {
-  --chassis: #e3e8eb;
-  --panel: #f6f8f9;
-  --panel-sunk: #edf1f3;
-  --ink: #1d2830;
-  --ink-soft: #55636e;
-  --rule: #c7d0d6;
-  --control: #24313b;
-  --control-ink: #f6f8f9;
-  --focus: #2f6eb5;
+@import 'tailwindcss';
 
-  --cool: #3b7ca8;
-  --mild: #4e9c8f;
-  --warm: #e2a03c;
-  --hot: #d8562c;
-  --critical: #b3232f;
+@plugin 'daisyui' {
+  themes: false;
+}
 
-  --font: 'Barlow', 'Segoe UI', system-ui, sans-serif;
-  --font-figures: 'Barlow Semi Condensed', 'Barlow', 'Segoe UI', system-ui, sans-serif;
-
-  --step--1: 0.8125rem;
-  --step-0: 0.9375rem;
-  --step-1: 1.125rem;
-  --step-2: 1.5rem;
-  --step-3: 2.25rem;
-  --step-4: 3.5rem;
-
-  --radius-s: 4px;
-  --radius-m: 10px;
-  --gutter: clamp(16px, 3vw, 32px);
-
+/* Brushed chassis metal for surfaces, slate for controls, amber for the brand. */
+@plugin 'daisyui/theme' {
+  name: 'fanwarden';
+  default: true;
   color-scheme: light;
+  --color-base-100: #f6f8f9;
+  --color-base-200: #e3e8eb;
+  --color-base-300: #c7d0d6;
+  --color-base-content: #1d2830;
+  --color-primary: #24313b;
+  --color-primary-content: #f6f8f9;
+  --color-secondary: #3b7ca8;
+  --color-secondary-content: #f6f8f9;
+  --color-accent: #e2a03c;
+  --color-accent-content: #1d2830;
+  --color-neutral: #24313b;
+  --color-neutral-content: #f6f8f9;
+  --color-info: #3b7ca8;
+  --color-info-content: #f6f8f9;
+  --color-success: #4e9c8f;
+  --color-success-content: #f6f8f9;
+  --color-warning: #e2a03c;
+  --color-warning-content: #1d2830;
+  --color-error: #b3232f;
+  --color-error-content: #f6f8f9;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.625rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --chassis: #11181d;
-    --panel: #19232a;
-    --panel-sunk: #141c22;
-    --ink: #e2e9ed;
-    --ink-soft: #8c9ba6;
-    --rule: #2b3943;
-    --control: #d9e2e8;
-    --control-ink: #121a1f;
-    --focus: #6aa8ef;
-    --cool: #5b9cc8;
-    --mild: #5fb3a5;
-    color-scheme: dark;
-  }
+@plugin 'daisyui/theme' {
+  name: 'fanwarden-dark';
+  prefersdark: true;
+  color-scheme: dark;
+  --color-base-100: #19232a;
+  --color-base-200: #11181d;
+  --color-base-300: #2b3943;
+  --color-base-content: #e2e9ed;
+  --color-primary: #d9e2e8;
+  --color-primary-content: #121a1f;
+  --color-secondary: #5b9cc8;
+  --color-secondary-content: #121a1f;
+  --color-accent: #e2a03c;
+  --color-accent-content: #121a1f;
+  --color-neutral: #2b3943;
+  --color-neutral-content: #e2e9ed;
+  --color-info: #5b9cc8;
+  --color-info-content: #121a1f;
+  --color-success: #5fb3a5;
+  --color-success-content: #121a1f;
+  --color-warning: #e2a03c;
+  --color-warning-content: #121a1f;
+  --color-error: #e05260;
+  --color-error-content: #121a1f;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.625rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@theme {
+  --font-sans: 'Barlow', 'Segoe UI', system-ui, sans-serif;
+  --font-figures: 'Barlow Semi Condensed', 'Barlow', 'Segoe UI', system-ui, sans-serif;
 }
 
-html {
-  font-family: var(--font);
-  font-size: 100%;
-  line-height: 1.45;
-  color: var(--ink);
-  background: var(--chassis);
-  -webkit-font-smoothing: antialiased;
-}
-
-body {
-  margin: 0;
-  min-height: 100dvh;
-}
-
-h1,
-h2,
-h3 {
-  margin: 0;
-  line-height: 1.15;
-  font-weight: 600;
-}
-
-h1 {
-  font-size: var(--step-2);
-}
-
-h2 {
-  font-size: var(--step-1);
-}
-
-p {
-  margin: 0;
-}
-
-a {
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.figure {
-  font-family: var(--font-figures);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.soft {
-  color: var(--ink-soft);
-}
-
-button,
-input,
-select {
-  font: inherit;
-  color: inherit;
-}
-
-button {
-  cursor: pointer;
-  border: 1px solid var(--control);
-  background: var(--control);
-  color: var(--control-ink);
-  border-radius: var(--radius-s);
-  padding: 0.45rem 0.9rem;
-  font-weight: 500;
-}
-
-button.quiet {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--rule);
-}
-
-button.danger {
-  background: transparent;
-  color: var(--critical);
-  border-color: currentColor;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-input,
-select {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-s);
-  padding: 0.4rem 0.55rem;
-  min-width: 0;
-}
-
-input[type='checkbox'] {
-  width: 1.05rem;
-  height: 1.05rem;
-  /* A long label wraps instead of squeezing the box */
-  flex: none;
-  accent-color: var(--control);
-}
-
-input[type='range'] {
-  accent-color: var(--control);
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-label.field {
-  display: grid;
-  gap: 0.25rem;
-  font-size: var(--step--1);
-  color: var(--ink-soft);
-}
-
-label.field > :is(input, select) {
-  font-size: var(--step-0);
-  color: var(--ink);
-}
-
-label.check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-m);
-  padding: clamp(14px, 2vw, 22px);
-}
-
-.grid-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.9rem 1.2rem;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0s !important;
-    transition-duration: 0s !important;
-  }
+/* Thermal scale, reserved for readings. Always emitted: thermal.ts picks one at run time. */
+@theme static {
+  --color-cool: #3b7ca8;
+  --color-mild: #4e9c8f;
+  --color-warm: #e2a03c;
+  --color-hot: #d8562c;
+  --color-critical: #b3232f;
 }

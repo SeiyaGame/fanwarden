@@ -172,8 +172,9 @@
   }
 </script>
 
-<figure class="editor">
+<div class="grid gap-3">
   <svg
+    class="h-auto w-full touch-none select-none"
     bind:this={svg}
     viewBox="0 0 {W} {H}"
     role="application"
@@ -184,7 +185,7 @@
   >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <rect
-      class="plot"
+      class="cursor-crosshair fill-base-200"
       x={PAD.left}
       y={PAD.top}
       width={W - PAD.left - PAD.right}
@@ -192,81 +193,132 @@
       onpointerdown={onPlotDown}
     />
 
-    {#if low > domain[0]}
-      <rect class="squeezed" x={PAD.left} y={PAD.top} width={x(low) - PAD.left} height={y(0) - PAD.top} />
-    {/if}
-    {#if high < domain[1]}
-      <rect
-        class="squeezed"
-        x={x(high)}
-        y={PAD.top}
-        width={W - PAD.right - x(high)}
-        height={y(0) - PAD.top}
-      />
-    {/if}
-    {#each [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as d (d)}
-      <line class="grid" class:major={d % 25 === 0} x1={PAD.left} x2={W - PAD.right} y1={y(d)} y2={y(d)} />
-    {/each}
-    {#each [0, 25, 50, 75, 100] as d (d)}
-      <text class="tick" x={PAD.left - 6} y={y(d) + 4} text-anchor="end">{d}%</text>
-    {/each}
-    {#each xGrid as g (g.t)}
-      <line class="grid" class:major={g.label} x1={x(g.t)} x2={x(g.t)} y1={PAD.top} y2={H - PAD.bottom} />
-      {#if g.label}
-        <text class="tick" x={x(g.t)} y={H - PAD.bottom + 18} text-anchor="middle">{g.t}°</text>
+    <g class="pointer-events-none">
+      {#if low > domain[0]}
+        <rect
+          class="fill-base-content/6"
+          x={PAD.left}
+          y={PAD.top}
+          width={x(low) - PAD.left}
+          height={y(0) - PAD.top}
+        />
       {/if}
-    {/each}
+      {#if high < domain[1]}
+        <rect
+          class="fill-base-content/6"
+          x={x(high)}
+          y={PAD.top}
+          width={W - PAD.right - x(high)}
+          height={y(0) - PAD.top}
+        />
+      {/if}
+      {#each [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as d (d)}
+        <line
+          class="stroke-base-300 {d % 25 === 0 ? '' : 'opacity-45'}"
+          x1={PAD.left}
+          x2={W - PAD.right}
+          y1={y(d)}
+          y2={y(d)}
+        />
+      {/each}
+      <g class="fill-base-content/60 font-figures text-xs">
+        {#each [0, 25, 50, 75, 100] as d (d)}
+          <text x={PAD.left - 6} y={y(d) + 4} text-anchor="end">{d}%</text>
+        {/each}
+        {#each xGrid as g (g.t)}
+          {#if g.label}
+            <text x={x(g.t)} y={H - PAD.bottom + 18} text-anchor="middle">{g.t}°</text>
+          {/if}
+        {/each}
+      </g>
+      {#each xGrid as g (g.t)}
+        <line
+          class="stroke-base-300 {g.label ? '' : 'opacity-45'}"
+          x1={x(g.t)}
+          x2={x(g.t)}
+          y1={PAD.top}
+          y2={H - PAD.bottom}
+        />
+      {/each}
 
-    {#if minDuty > 0}
-      <rect
-        class="limit"
-        x={PAD.left}
-        y={y(minDuty)}
-        width={W - PAD.left - PAD.right}
-        height={y(0) - y(minDuty)}
-      />
-    {/if}
-    {#if maxDuty < 100}
-      <rect
-        class="limit"
-        x={PAD.left}
-        y={y(100)}
-        width={W - PAD.left - PAD.right}
-        height={y(maxDuty) - y(100)}
-      />
-    {/if}
+      {#if minDuty > 0}
+        <rect
+          class="fill-base-content/9"
+          x={PAD.left}
+          y={y(minDuty)}
+          width={W - PAD.left - PAD.right}
+          height={y(0) - y(minDuty)}
+        />
+      {/if}
+      {#if maxDuty < 100}
+        <rect
+          class="fill-base-content/9"
+          x={PAD.left}
+          y={y(100)}
+          width={W - PAD.left - PAD.right}
+          height={y(maxDuty) - y(100)}
+        />
+      {/if}
 
-    {#if target !== null && safetyFrom !== null}
-      <!-- Target mode: the curve only applies from the safety threshold, the rest is faded. -->
-      <clipPath id={clipId}>
-        <rect x={x(safetyFrom)} y="0" width={W} height={H} />
-      </clipPath>
-      <path class="curve faded" d={path} />
-      <path class="curve" d={path} clip-path="url(#{clipId})" />
-      <line class="safety" x1={x(safetyFrom)} x2={x(safetyFrom)} y1={PAD.top} y2={H - PAD.bottom} />
-      <text class="safety-label" x={x(safetyFrom) + 6} y={H - PAD.bottom - 8}
-        >Safety curve from {safetyFrom}°</text
-      >
-      <line class="target" x1={x(target)} x2={x(target)} y1={PAD.top} y2={H - PAD.bottom} />
-      <text class="target-label" x={x(target) - 6} y={H - PAD.bottom - 8} text-anchor="end"
-        >Target {target}°</text
-      >
-    {:else}
-      <path class="curve" d={path} />
-    {/if}
+      {#if target !== null && safetyFrom !== null}
+        <!-- Target mode: the curve only applies from the safety threshold, the rest is faded. -->
+        <clipPath id={clipId}>
+          <rect x={x(safetyFrom)} y="0" width={W} height={H} />
+        </clipPath>
+        <path
+          class="fill-none stroke-base-content stroke-[2.5] opacity-25 [stroke-dasharray:6_5] [stroke-linejoin:round]"
+          d={path}
+        />
+        <path
+          class="fill-none stroke-base-content stroke-[2.5] [stroke-linejoin:round]"
+          d={path}
+          clip-path="url(#{clipId})"
+        />
+        <line
+          class="stroke-hot stroke-[1.5] [stroke-dasharray:3_3]"
+          x1={x(safetyFrom)}
+          x2={x(safetyFrom)}
+          y1={PAD.top}
+          y2={H - PAD.bottom}
+        />
+        <text class="fill-hot text-xs font-semibold" x={x(safetyFrom) + 6} y={H - PAD.bottom - 8}
+          >Safety curve from {safetyFrom}°</text
+        >
+        <line class="stroke-mild stroke-3" x1={x(target)} x2={x(target)} y1={PAD.top} y2={H - PAD.bottom} />
+        <text
+          class="fill-mild text-xs font-semibold"
+          x={x(target) - 6}
+          y={H - PAD.bottom - 8}
+          text-anchor="end">Target {target}°</text
+        >
+      {:else}
+        <path class="fill-none stroke-base-content stroke-[2.5] [stroke-linejoin:round]" d={path} />
+      {/if}
 
-    {#if current !== null && currentDuty !== null}
-      <line class="now" x1={x(current)} x2={x(current)} y1={PAD.top} y2={H - PAD.bottom} />
-      <circle class="now-dot" cx={x(current)} cy={y(currentDuty)} r="6" fill={thermalColor(current, probe)} />
-      <text class="now-label" x={x(current) + 8} y={PAD.top + 12}
-        >Now {current}° → {Math.round(currentDuty)}%</text
-      >
-    {/if}
+      {#if current !== null && currentDuty !== null}
+        <line
+          class="stroke-base-content/60 [stroke-dasharray:4_4]"
+          x1={x(current)}
+          x2={x(current)}
+          y1={PAD.top}
+          y2={H - PAD.bottom}
+        />
+        <circle
+          class="stroke-base-100 stroke-2"
+          cx={x(current)}
+          cy={y(currentDuty)}
+          r="6"
+          fill={thermalColor(current, probe)}
+        />
+        <text class="fill-base-content text-xs font-semibold" x={x(current) + 8} y={PAD.top + 12}
+          >Now {current}° → {Math.round(currentDuty)}%</text
+        >
+      {/if}
+    </g>
 
     {#each points as [t, d], i (i)}
       <g
-        class="point"
-        class:selected={selected === i}
+        class="group cursor-grab outline-none"
         transform="translate({x(t)},{y(d)})"
         tabindex="0"
         role="slider"
@@ -278,198 +330,52 @@
         onkeydown={(e) => onKey(e, i)}
         onfocus={() => (selected = i)}
       >
-        <circle class="hit" r="16" />
-        <circle class="dot" r="6.5" />
+        <circle
+          class="fill-transparent group-focus-visible:stroke-primary group-focus-visible:stroke-2"
+          r="16"
+        />
+        <circle
+          class="stroke-base-content stroke-[2.5] group-focus-visible:fill-base-content {selected === i
+            ? 'fill-base-content'
+            : 'fill-base-100'}"
+          r="6.5"
+        />
       </g>
     {/each}
   </svg>
 
   {#each problems as problem (problem)}
-    <p class="problem">{problem}</p>
+    <div role="alert" class="alert alert-error alert-soft py-2 text-sm">{problem}</div>
   {/each}
-  <figcaption>
+  <p class="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-2 text-sm">
     {#if selected !== null && points[selected]}
       {@const index = selected}
-      <span>Point {index + 1}</span>
-      <label class="inline"
+      <span class="font-semibold">Point {index + 1}</span>
+      <label class="input input-sm w-28"
         ><input
           type="number"
+          aria-label="Temperature"
           value={points[index][0]}
           onchange={(e) => move(index, Number(e.currentTarget.value), points[index][1])}
-        />°C</label
+        /><span class="label">°C</span></label
       >
-      <label class="inline"
+      <label class="input input-sm w-28"
         ><input
           type="number"
+          aria-label="Fan speed"
           value={points[index][1]}
           min="0"
           max="100"
           onchange={(e) => move(index, points[index][0], Number(e.currentTarget.value))}
-        />%</label
+        /><span class="label">%</span></label
       >
-      <button class="quiet" disabled={points.length <= 1} onclick={() => remove(index)}>Remove point</button>
+      <button class="btn btn-ghost btn-sm" disabled={points.length <= 1} onclick={() => remove(index)}
+        >Remove point</button
+      >
     {:else}
-      <span class="soft"
+      <span class="text-base-content/60"
         >Click the plot to add a point. Drag a point, or select it and use the arrow keys.</span
       >
     {/if}
-  </figcaption>
-</figure>
-
-<style>
-  .editor {
-    margin: 0;
-    display: grid;
-    gap: 0.6rem;
-  }
-
-  svg {
-    width: 100%;
-    height: auto;
-    touch-action: none;
-    user-select: none;
-  }
-
-  .plot {
-    fill: var(--panel-sunk);
-    cursor: crosshair;
-  }
-
-  .grid {
-    stroke: var(--rule);
-    stroke-width: 1;
-    opacity: 0.45;
-    pointer-events: none;
-  }
-
-  .grid.major {
-    opacity: 1;
-  }
-
-  .squeezed {
-    fill: var(--ink-soft);
-    opacity: 0.06;
-    pointer-events: none;
-  }
-
-  .tick {
-    fill: var(--ink-soft);
-    font-size: 12px;
-    font-family: var(--font-figures);
-  }
-
-  .limit {
-    fill: var(--ink-soft);
-    opacity: 0.09;
-    pointer-events: none;
-  }
-
-  .curve {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-    pointer-events: none;
-  }
-
-  .curve.faded {
-    opacity: 0.25;
-    stroke-dasharray: 6 5;
-  }
-
-  .target {
-    stroke: var(--mild);
-    stroke-width: 3;
-    pointer-events: none;
-  }
-
-  .target-label,
-  .safety-label {
-    font-size: 12px;
-    font-weight: 600;
-    pointer-events: none;
-  }
-
-  .target-label {
-    fill: var(--mild);
-  }
-
-  .safety {
-    stroke: var(--hot);
-    stroke-width: 1.5;
-    stroke-dasharray: 3 3;
-    pointer-events: none;
-  }
-
-  .safety-label {
-    fill: var(--hot);
-  }
-
-  .now {
-    stroke: var(--ink-soft);
-    stroke-dasharray: 4 4;
-    pointer-events: none;
-  }
-
-  .now-dot {
-    stroke: var(--panel);
-    stroke-width: 2;
-    pointer-events: none;
-  }
-
-  .now-label {
-    fill: var(--ink);
-    font-size: 12px;
-    font-weight: 600;
-    pointer-events: none;
-  }
-
-  .point {
-    cursor: grab;
-    outline: none;
-  }
-
-  .point .hit {
-    fill: transparent;
-  }
-
-  .point .dot {
-    fill: var(--panel);
-    stroke: var(--ink);
-    stroke-width: 2.5;
-  }
-
-  .point.selected .dot,
-  .point:focus-visible .dot {
-    fill: var(--ink);
-  }
-
-  .point:focus-visible .hit {
-    stroke: var(--focus);
-    stroke-width: 2;
-  }
-
-  figcaption {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem 1rem;
-    min-height: 2.3rem;
-    font-size: var(--step--1);
-  }
-
-  .inline {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-
-  .inline input {
-    width: 4.5rem;
-  }
-
-  .problem {
-    color: var(--critical);
-    font-size: var(--step--1);
-  }
-</style>
+  </p>
+</div>
