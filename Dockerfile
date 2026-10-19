@@ -18,11 +18,10 @@ ARG FANWARDEN_BUILD=""
 RUN FANWARDEN_BUILD="$FANWARDEN_BUILD" cargo build --release --locked
 
 # Runtime: the tools fanwarden calls
-FROM alpine:3.24
+FROM alpine:3.24 AS runtime
 RUN apk add --no-cache ipmitool smartmontools lsblk tzdata shadow su-exec libcap-setcap \
     && addgroup -g 1000 abc \
     && adduser -D -H -u 1000 -G abc abc
-COPY --from=build /src/target/release/fanwarden /usr/local/bin/fanwarden
 COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
 ENV FANWARDEN_CONFIG=/data/config.toml \
     PUID=1000 \
@@ -32,3 +31,11 @@ VOLUME /data
 EXPOSE 9495
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 CMD ["fanwarden", "healthcheck"]
 ENTRYPOINT ["/entrypoint.sh"]
+
+# The CI compiles the musl binary once, with a cache, and only packages it: --target prebuilt
+FROM runtime AS prebuilt
+COPY --chmod=755 fanwarden-x86_64-linux /usr/local/bin/fanwarden
+
+# Default: built from source
+FROM runtime
+COPY --from=build /src/target/release/fanwarden /usr/local/bin/fanwarden
