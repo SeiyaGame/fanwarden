@@ -14,6 +14,7 @@ use serde_json::json;
 use super::auth;
 use crate::calibration::{self, CalibrationStatus, Timing};
 use crate::config::{Config, NotificationChannel};
+use crate::config_history::Origin;
 use crate::notify::{Notification, Severity};
 use crate::state::AppState;
 
@@ -178,6 +179,7 @@ pub async fn put_config(State(state): State<Arc<AppState>>, Json(incoming): Json
         tracing::info!("web listen address changed to {}: restart the service to apply", merged.web.listen);
     }
     state.set_config(merged)?;
+    state.config_history.record(&state.config(), Origin::Ui, crate::now());
     tracing::info!("configuration updated from the web UI");
     Ok(Json(state.config().redacted()).into_response())
 }
@@ -191,8 +193,28 @@ pub async fn reload_config(State(state): State<Arc<AppState>>) -> ApiResult {
     if config.web.listen != listen {
         tracing::info!("web listen address changed to {}: restart the service to apply", config.web.listen);
     }
+    state.config_history.record(&config, Origin::File, crate::now());
     tracing::info!("configuration reloaded from {}", state.config_path.display());
     Ok(Json(config.redacted()).into_response())
+}
+
+/// Last versions of the configuration, newest first.
+pub async fn config_history(State(state): State<Arc<AppState>>) -> Response {
+    Json(state.config_history.views()).into_response()
+}
+
+/// Brings a previous version back. The web password stays the current one.
+pub async fn restore_config(State(state): State<Arc<AppState>>, Path(id): Path<u64>) -> ApiResult {
+    let Some(version) = state.config_history.get(id) else {
+        return Err(ApiError(StatusCode::NOT_FOUND, format!("unknown version {id}")));
+    };
+    let mut config = version.config;
+    config.web.password_hash = state.config().web.password_hash;
+    config.validate().map_err(|e| bad_request(format!("{e:#}")))?;
+    state.set_config(config)?;
+    state.config_history.record(&state.config(), Origin::Restore { from_ts: version.ts }, crate::now());
+    tracing::info!("configuration restored to version {id}");
+    Ok(Json(state.config().redacted()).into_response())
 }
 
 // ---- Manual control ------------------------------------------------------------------------

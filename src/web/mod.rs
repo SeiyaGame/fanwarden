@@ -30,6 +30,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/events", get(api::events))
         .route("/config", get(api::get_config).put(api::put_config))
         .route("/config/reload", post(api::reload_config))
+        .route("/config/history", get(api::config_history))
+        .route("/config/history/{id}/restore", post(api::restore_config))
         .route("/zones/{id}/manual", put(api::set_manual))
         .route("/zones/{id}/calibration", post(api::start_calibration).delete(api::cancel_calibration))
         .route("/history", get(api::history))

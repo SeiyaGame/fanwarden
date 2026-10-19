@@ -12,6 +12,7 @@ use crate::alerts::ActiveAlert;
 use crate::bmc::Bmc;
 use crate::calibration::{self, CalibrationStatus, Reference};
 use crate::config::{Config, FanMode};
+use crate::config_history::{self, ConfigHistory, Origin};
 use crate::events::EventLog;
 use crate::history::History;
 use crate::ipmi::FanReading;
@@ -97,6 +98,7 @@ pub struct AppState {
     calibration: Mutex<Option<CalibrationStatus>>,
     pub calibration_cancel: AtomicBool,
     references: RwLock<BTreeMap<u8, Reference>>,
+    pub config_history: ConfigHistory,
 }
 
 impl AppState {
@@ -110,6 +112,9 @@ impl AppState {
     ) -> Arc<Self> {
         let (live, _) = broadcast::channel(16);
         let references = calibration::load_references(&calibration::references_path(&config_path));
+        // The file may have been edited while the service was stopped.
+        let config_history = ConfigHistory::load(config_history::history_path(&config_path));
+        config_history.record(&config, Origin::Startup, crate::now());
         Arc::new(Self {
             config_path,
             config: RwLock::new(config),
@@ -127,6 +132,7 @@ impl AppState {
             calibration: Mutex::new(None),
             calibration_cancel: AtomicBool::new(false),
             references: RwLock::new(references),
+            config_history,
         })
     }
 

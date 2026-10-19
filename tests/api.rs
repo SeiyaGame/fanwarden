@@ -182,6 +182,35 @@ async fn manual_duty() {
 }
 
 #[tokio::test]
+async fn config_history_and_restore() {
+    let mut app = logged_in(Config::default()).await;
+    let hash = app.state.config().web.password_hash;
+
+    let (_, mut config, _) = app.call("GET", "/api/config", None).await;
+    config["general"]["interval_secs"] = json!(30);
+    assert_eq!(app.call("PUT", "/api/config", Some(config)).await.0, StatusCode::OK);
+
+    let (status, versions, _) = app.call("GET", "/api/config/history", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let versions = versions.as_array().unwrap();
+    // Startup, then the save (the password setup alone is not a version).
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions[0]["origin"]["kind"], "ui");
+    assert!(versions[0]["toml"].as_str().unwrap().contains("interval_secs = 30"));
+    let first = versions[1]["id"].as_u64().unwrap();
+
+    let (status, _, _) = app.call("POST", &format!("/api/config/history/{first}/restore"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(app.state.config().general.interval_secs, 10);
+    // Restoring never brings back an old web password.
+    assert_eq!(app.state.config().web.password_hash, hash);
+    let (_, versions, _) = app.call("GET", "/api/config/history", None).await;
+    assert_eq!(versions[0]["origin"]["kind"], "restore");
+
+    assert_eq!(app.call("POST", "/api/config/history/999/restore", None).await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn calibration_starts_once_and_can_be_cancelled() {
     let mut app = logged_in(Config::default()).await;
     assert_eq!(app.call("POST", "/api/zones/1/calibration", None).await.0, StatusCode::SERVICE_UNAVAILABLE);

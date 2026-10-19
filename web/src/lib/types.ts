@@ -189,6 +189,14 @@ export interface Config {
   zones: Zone[]
 }
 
+export interface ConfigVersion {
+  id: number
+  ts: number
+  origin: { kind: 'startup' | 'ui' | 'file' } | { kind: 'restore'; from_ts: number }
+  /** TOML, secrets replaced by `(secret n)`. */
+  toml: string
+}
+
 export interface LogEvent {
   id: number
   ts: number
