@@ -16,7 +16,7 @@ COPY --from=web /web/dist ./web/dist
 RUN cargo build --release --locked
 
 # Runtime: the tools fanwarden calls
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache ipmitool smartmontools lsblk tzdata shadow su-exec libcap-setcap \
     && addgroup -g 1000 abc \
     && adduser -D -H -u 1000 -G abc abc
