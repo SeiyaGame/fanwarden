@@ -47,324 +47,333 @@
   }
 </script>
 
-<div class="page">
-  <header class="head">
-    <h1>Settings</h1>
-    <div class="reload">
-      <button class="quiet" onclick={reload} disabled={reloading}>
+<div class="grid gap-6">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <h1 class="text-2xl font-semibold">Settings</h1>
+    <div class="grid justify-items-start gap-1 text-sm sm:justify-items-end">
+      <button class="btn btn-sm" onclick={reload} disabled={reloading}>
+        {#if reloading}<span class="loading loading-spinner loading-xs"></span>{/if}
         {configStore.dirty ? 'Discard my changes and reload the file' : 'Reload the configuration file'}
       </button>
-      <p class="soft">Applies changes made by hand in config.toml, without restarting.</p>
+      <p class="text-base-content/60">Applies changes made by hand in config.toml, without restarting.</p>
     </div>
   </header>
   {#if reloadMessage}
-    <p class:error={!reloadMessage.ok} role="status">{reloadMessage.text}</p>
+    <div role="status" class="alert alert-soft {reloadMessage.ok ? 'alert-success' : 'alert-error'}">
+      {reloadMessage.text}
+    </div>
   {/if}
 
   {#if update}
-    <section class="panel" aria-labelledby="update-title">
-      <h2 id="update-title">
-        {update.available && update.latest ? `Version ${update.latest.version} is available` : 'Version'}
-      </h2>
-      <p>
-        This is fanwarden {update.current}{#if update.build}&nbsp;({update.build}){/if}.
-        {#if !update.enabled}
-          Checking for new versions is off.
-        {:else if update.error}
-          <span class="error">Cannot check for a new version: {update.error}</span>
-        {:else if update.checked && !update.available}
-          It is the latest release (checked {new Date(update.checked * 1000).toLocaleString()}).
-        {/if}
-      </p>
-      {#if update.available && update.latest}
-        {#each notes as section, i (i)}
-          <div class="notes">
-            {#if section.title}<h3>{section.title}</h3>{/if}
-            <ul>
-              {#each section.items as item, j (j)}<li>{item}</li>{/each}
-            </ul>
-          </div>
-        {/each}
-        <p><a href={update.latest.url} target="_blank" rel="noreferrer">Release page on GitHub</a></p>
-        <div class="how">
+    <section
+      class="card border bg-base-100 {update.available ? 'border-success' : 'border-base-300'}"
+      aria-labelledby="update-title"
+    >
+      <div class="card-body gap-3">
+        <h2 id="update-title" class="card-title">
+          {update.available && update.latest ? `Version ${update.latest.version} is available` : 'Version'}
+          {#if update.available}<span class="badge badge-success badge-sm">new</span>{/if}
+        </h2>
+        <p>
+          This is fanwarden {update.current}{#if update.build}&nbsp;({update.build}){/if}.
+          {#if !update.enabled}
+            Checking for new versions is off.
+          {:else if update.error}
+            <span class="text-error">Cannot check for a new version: {update.error}</span>
+          {:else if update.checked && !update.available}
+            It is the latest release (checked {new Date(update.checked * 1000).toLocaleString()}).
+          {/if}
+        </p>
+        {#if update.available && update.latest}
+          {#each notes as section, i (i)}
+            <div>
+              {#if section.title}<h3 class="font-semibold">{section.title}</h3>{/if}
+              <ul class="list-disc pl-5">
+                {#each section.items as item, j (j)}<li>{item}</li>{/each}
+              </ul>
+            </div>
+          {/each}
+          <p>
+            <a class="link link-primary" href={update.latest.url} target="_blank" rel="noreferrer"
+              >Release page on GitHub</a
+            >
+          </p>
           <p>To update, run the installer again with the folder fanwarden is installed in:</p>
-          <pre><code
-              >curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fanwarden/main/install.sh
-sudo bash install.sh --dir /opt/fanwarden</code
-            ></pre>
-          <p>With Docker: <code>docker compose pull && docker compose up -d</code>.</p>
-        </div>
-      {/if}
+          <div class="mockup-code text-sm">
+            <pre data-prefix="$"><code
+                >curl -fsSLO https://raw.githubusercontent.com/SeiyaGame/fanwarden/main/install.sh</code
+              ></pre>
+            <pre data-prefix="$"><code>sudo bash install.sh --dir /opt/fanwarden</code></pre>
+          </div>
+          <p>With Docker: <code class="font-mono">docker compose pull && docker compose up -d</code>.</p>
+        {/if}
+      </div>
     </section>
   {/if}
 
   {#if config}
-    <section class="panel" aria-labelledby="control-title">
-      <h2 id="control-title">Control</h2>
-      <div class="grid-fields">
-        <label class="field"
-          >Check temperatures every (seconds)
-          <input type="number" min="2" bind:value={config.general.interval_secs} /></label
-        >
-        <label class="field"
-          >Failsafe speed (%) <input
-            type="number"
-            min="0"
-            max="100"
-            bind:value={config.general.failsafe_duty}
-          /></label
-        >
-        <label class="field"
-          >Resend speeds every (seconds) <input
-            type="number"
-            min="10"
-            bind:value={config.general.reapply_secs}
-          /></label
-        >
-        <label class="field"
-          >When the service stops, hand fans back in mode
-          <select bind:value={config.general.exit_fan_mode}>
-            <option value="standard">Standard</option>
-            <option value="optimal">Optimal</option>
-            <option value="heavy_io">Heavy IO</option>
-            <option value="full">Full</option>
-          </select>
-        </label>
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.general.dry_run} /> Dry run: compute speeds without applying
-          them</label
-        >
-      </div>
-    </section>
-
-    <section class="panel" aria-labelledby="regulation-title">
-      <h2 id="regulation-title">Target temperature mode</h2>
-      <p class="soft">
-        A source set to hold a temperature follows its curve again when it runs this far above its target,
-        without waiting for the regulation.
-      </p>
-      <div class="grid-fields">
-        <label class="field"
-          >Safety net for disks and other sensors (°C above target)
-          <input
-            type="number"
-            min="1"
-            max="30"
-            step="0.5"
-            bind:value={config.regulation.safety_margin_disks}
-          /></label
-        >
-        <label class="field"
-          >Safety net for the CPU (°C above target)
-          <input
-            type="number"
-            min="1"
-            max="30"
-            step="0.5"
-            bind:value={config.regulation.safety_margin_cpu}
-          /></label
-        >
-      </div>
-    </section>
-
-    <section class="panel" aria-labelledby="ipmi-title">
-      <h2 id="ipmi-title">BMC connection</h2>
-      <div class="grid-fields">
-        <label class="field"
-          >Board
-          <select bind:value={config.ipmi.target}>
-            <option value="local">This machine (/dev/ipmi0)</option>
-            <option value="remote">Over the network</option>
-          </select>
-        </label>
-        {#if config.ipmi.target === 'remote'}
-          <label class="field"
-            >BMC address <input bind:value={config.ipmi.host} placeholder="192.168.1.20" /></label
-          >
-          <label class="field">User <input bind:value={config.ipmi.username} autocomplete="off" /></label>
-          <label class="field"
-            >Password <input
-              type="password"
-              bind:value={config.ipmi.password}
-              autocomplete="new-password"
-            /></label
-          >
-          <label class="field"
-            >Protocol
-            <select bind:value={config.ipmi.interface}>
-              <option value="lanplus">IPMI 2.0 (lanplus)</option>
-              <option value="lan">IPMI 1.5 (lan)</option>
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="control-title">
+      <div class="card-body">
+        <h2 id="control-title" class="card-title">Control</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Check temperatures every (seconds)</legend>
+            <input class="input w-full" type="number" min="2" bind:value={config.general.interval_secs} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Failsafe speed (%)</legend>
+            <input
+              class="input w-full"
+              type="number"
+              min="0"
+              max="100"
+              bind:value={config.general.failsafe_duty}
+            />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Resend speeds every (seconds)</legend>
+            <input class="input w-full" type="number" min="10" bind:value={config.general.reapply_secs} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">When the service stops, hand fans back in mode</legend>
+            <select class="select w-full" bind:value={config.general.exit_fan_mode}>
+              <option value="standard">Standard</option>
+              <option value="optimal">Optimal</option>
+              <option value="heavy_io">Heavy IO</option>
+              <option value="full">Full</option>
             </select>
-          </label>
-        {/if}
-        <label class="field">ipmitool command <input bind:value={config.ipmi.ipmitool_path} /></label>
-        <label class="field"
-          >Command timeout (seconds) <input
-            type="number"
-            min="1"
-            bind:value={config.ipmi.timeout_secs}
-          /></label
+          </fieldset>
+        </div>
+        <label class="label mt-2 cursor-pointer gap-3 whitespace-normal text-base-content"
+          ><input
+            type="checkbox"
+            class="toggle toggle-sm toggle-warning"
+            bind:checked={config.general.dry_run}
+          />
+          Dry run: compute speeds without applying them</label
         >
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="disks-title">
-      <h2 id="disks-title">Disks</h2>
-      <div class="grid-fields">
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.disks.enabled} /> Read disk temperatures</label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.disks.skip_standby} /> Let sleeping disks sleep</label
-        >
-        <label class="field"
-          >Read disks every (seconds) <input
-            type="number"
-            min="5"
-            bind:value={config.disks.interval_secs}
-          /></label
-        >
-        <label class="field"
-          >Ignore disks matching (regex) <input
-            bind:value={config.disks.exclude}
-            placeholder="^(zram|loop)"
-          /></label
-        >
-        <label class="field">smartctl command <input bind:value={config.disks.smartctl_path} /></label>
-        <label class="field">lsblk command <input bind:value={config.disks.lsblk_path} /></label>
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="regulation-title">
+      <div class="card-body">
+        <h2 id="regulation-title" class="card-title">Target temperature mode</h2>
+        <p class="text-sm text-base-content/70">
+          A source set to hold a temperature follows its curve again when it runs this far above its target,
+          without waiting for the regulation.
+        </p>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Safety net for disks and other sensors (°C above target)</legend>
+            <input
+              class="input w-full"
+              type="number"
+              min="1"
+              max="30"
+              step="0.5"
+              bind:value={config.regulation.safety_margin_disks}
+            />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Safety net for the CPU (°C above target)</legend>
+            <input
+              class="input w-full"
+              type="number"
+              min="1"
+              max="30"
+              step="0.5"
+              bind:value={config.regulation.safety_margin_cpu}
+            />
+          </fieldset>
+        </div>
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="data-title">
-      <h2 id="data-title">History and metrics</h2>
-      <div class="grid-fields">
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.history.enabled} /> Keep a history</label
-        >
-        <label class="field"
-          >Keep history for (days) <input
-            type="number"
-            min="1"
-            bind:value={config.history.retention_days}
-          /></label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.web.metrics_enabled} /> Publish Prometheus metrics on /metrics</label
-        >
-        <label class="check"
-          ><input type="checkbox" bind:checked={config.general.check_updates} /> Check GitHub for a new version
-          twice a day</label
-        >
-        <label class="field"
-          >Web address (applies after a restart) <input bind:value={config.web.listen} /></label
-        >
-        <label class="field"
-          >Stay signed in for (hours) <input
-            type="number"
-            min="1"
-            bind:value={config.web.session_hours}
-          /></label
-        >
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="ipmi-title">
+      <div class="card-body">
+        <h2 id="ipmi-title" class="card-title">BMC connection</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Board</legend>
+            <select class="select w-full" bind:value={config.ipmi.target}>
+              <option value="local">This machine (/dev/ipmi0)</option>
+              <option value="remote">Over the network</option>
+            </select>
+          </fieldset>
+          {#if config.ipmi.target === 'remote'}
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">BMC address</legend>
+              <input class="input w-full" bind:value={config.ipmi.host} placeholder="192.168.1.20" />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">User</legend>
+              <input class="input w-full" bind:value={config.ipmi.username} autocomplete="off" />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Password</legend>
+              <input
+                class="input w-full"
+                type="password"
+                bind:value={config.ipmi.password}
+                autocomplete="new-password"
+              />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Protocol</legend>
+              <select class="select w-full" bind:value={config.ipmi.interface}>
+                <option value="lanplus">IPMI 2.0 (lanplus)</option>
+                <option value="lan">IPMI 1.5 (lan)</option>
+              </select>
+            </fieldset>
+          {/if}
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">ipmitool command</legend>
+            <input class="input w-full" bind:value={config.ipmi.ipmitool_path} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Command timeout (seconds)</legend>
+            <input class="input w-full" type="number" min="1" bind:value={config.ipmi.timeout_secs} />
+          </fieldset>
+        </div>
+      </div>
+    </section>
+
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="disks-title">
+      <div class="card-body">
+        <h2 id="disks-title" class="card-title">Disks</h2>
+        <div class="flex flex-wrap gap-x-8 gap-y-3">
+          <label class="label cursor-pointer gap-3 text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.disks.enabled}
+            />
+            Read disk temperatures</label
+          >
+          <label class="label cursor-pointer gap-3 text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.disks.skip_standby}
+            /> Let sleeping disks sleep</label
+          >
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Read disks every (seconds)</legend>
+            <input class="input w-full" type="number" min="5" bind:value={config.disks.interval_secs} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Ignore disks matching (regex)</legend>
+            <input
+              class="input w-full font-mono"
+              bind:value={config.disks.exclude}
+              placeholder="^(zram|loop)"
+            />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">smartctl command</legend>
+            <input class="input w-full" bind:value={config.disks.smartctl_path} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">lsblk command</legend>
+            <input class="input w-full" bind:value={config.disks.lsblk_path} />
+          </fieldset>
+        </div>
+      </div>
+    </section>
+
+    <section class="card border border-base-300 bg-base-100" aria-labelledby="data-title">
+      <div class="card-body">
+        <h2 id="data-title" class="card-title">History and metrics</h2>
+        <div class="grid gap-3">
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.history.enabled}
+            />
+            Keep a history</label
+          >
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.web.metrics_enabled}
+            /> Publish Prometheus metrics on /metrics</label
+          >
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
+            ><input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              bind:checked={config.general.check_updates}
+            /> Check GitHub for a new version twice a day</label
+          >
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Keep history for (days)</legend>
+            <input class="input w-full" type="number" min="1" bind:value={config.history.retention_days} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Web address (applies after a restart)</legend>
+            <input class="input w-full" bind:value={config.web.listen} />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Stay signed in for (hours)</legend>
+            <input class="input w-full" type="number" min="1" bind:value={config.web.session_hours} />
+          </fieldset>
+        </div>
       </div>
     </section>
   {/if}
 
-  <section class="panel" aria-labelledby="password-title">
-    <h2 id="password-title">Password</h2>
-    <form class="grid-fields" onsubmit={changePassword}>
-      <label class="field"
-        >Current password <input
-          type="password"
-          bind:value={current}
-          autocomplete="current-password"
-          required
-        /></label
+  <section class="card border border-base-300 bg-base-100" aria-labelledby="password-title">
+    <div class="card-body">
+      <h2 id="password-title" class="card-title">Password</h2>
+      <form
+        class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] items-end gap-x-4"
+        onsubmit={changePassword}
       >
-      <label class="field"
-        >New password <input
-          type="password"
-          bind:value={next}
-          minlength="8"
-          autocomplete="new-password"
-          required
-        /></label
-      >
-      <label class="field"
-        >New password again
-        <input
-          type="password"
-          bind:value={confirm}
-          minlength="8"
-          autocomplete="new-password"
-          required
-        /></label
-      >
-      <div class="submit"><button type="submit">Change password</button></div>
-    </form>
-    {#if passwordMessage}
-      <p class:error={!passwordMessage.ok}>{passwordMessage.text}</p>
-    {/if}
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Current password</legend>
+          <input
+            class="input w-full"
+            type="password"
+            bind:value={current}
+            autocomplete="current-password"
+            required
+          />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">New password</legend>
+          <input
+            class="input w-full"
+            type="password"
+            bind:value={next}
+            minlength="8"
+            autocomplete="new-password"
+            required
+          />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">New password again</legend>
+          <input
+            class="input w-full"
+            type="password"
+            bind:value={confirm}
+            minlength="8"
+            autocomplete="new-password"
+            required
+          />
+        </fieldset>
+        <div class="py-1"><button type="submit" class="btn btn-primary">Change password</button></div>
+      </form>
+      {#if passwordMessage}
+        <div role="status" class="alert alert-soft {passwordMessage.ok ? 'alert-success' : 'alert-error'}">
+          {passwordMessage.text}
+        </div>
+      {/if}
+    </div>
   </section>
 </div>
-
-<style>
-  .page {
-    display: grid;
-    gap: var(--gutter);
-  }
-
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: start;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .reload {
-    display: grid;
-    justify-items: end;
-    gap: 0.3rem;
-    font-size: var(--step--1);
-  }
-
-  section.panel {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .submit {
-    align-self: end;
-  }
-
-  section.panel p,
-  .notes h3,
-  .notes ul {
-    margin: 0;
-  }
-
-  .notes h3 {
-    font-size: var(--step-0);
-  }
-
-  .notes ul {
-    padding-left: 1.2rem;
-  }
-
-  .how {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  pre {
-    margin: 0;
-    padding: 0.75rem;
-    overflow-x: auto;
-    background: var(--panel-sunk);
-    border-radius: var(--radius-s);
-  }
-
-  .error {
-    color: var(--critical);
-  }
-</style>

@@ -55,10 +55,10 @@
   }
 </script>
 
-<div class="page">
-  <header class="intro">
-    <h1>Fan curves</h1>
-    <p class="soft">
+<div class="grid gap-6">
+  <header class="grid max-w-[70ch] gap-2">
+    <h1 class="text-2xl font-semibold">Fan curves</h1>
+    <p class="text-base-content/70">
       Each zone follows the hottest of its sources: every source has its own curve, and the zone runs at the
       highest speed they ask for. A zone whose source cannot be read runs at the failsafe speed.
     </p>
@@ -66,178 +66,142 @@
 
   {#if config}
     {#each config.zones as zone, zi (zi)}
-      <section class="panel zone" aria-labelledby="zone-title-{zi}">
-        <header class="zone-head">
-          <h2 id="zone-title-{zi}">{zone.name || `Zone ${zone.id}`}</h2>
-          <button
-            class="danger"
-            onclick={() => config.zones.splice(zi, 1)}
-            title="The BMC keeps the last speed it was given for this zone">Remove zone</button
-          >
-        </header>
+      <section class="card border border-base-300 bg-base-100" aria-labelledby="zone-title-{zi}">
+        <div class="card-body gap-5">
+          <header class="flex flex-wrap items-center justify-between gap-4">
+            <h2 id="zone-title-{zi}" class="card-title">{zone.name || `Zone ${zone.id}`}</h2>
+            <button
+              class="btn btn-sm btn-error btn-outline"
+              onclick={() => config.zones.splice(zi, 1)}
+              title="The BMC keeps the last speed it was given for this zone">Remove zone</button
+            >
+          </header>
 
-        <div class="grid-fields">
-          <label class="field">Name <input bind:value={zone.name} /></label>
-          <label class="field"
-            >IPMI zone
-            <select bind:value={zone.id}>
-              <option value={0}>0 — CPU fans (FAN1…)</option>
-              <option value={1}>1 — Peripheral fans (FANA…)</option>
-              {#each [2, 3] as id (id)}<option value={id}>{id}</option>{/each}
-            </select>
-          </label>
-          <label class="field"
-            >Minimum speed (%) <input type="number" min="0" max="100" bind:value={zone.min_duty} /></label
-          >
-          <label class="field"
-            >Maximum speed (%) <input type="number" min="0" max="100" bind:value={zone.max_duty} /></label
-          >
-          <label class="field" title="How far the temperature must drop before the fans slow down"
-            >Slow down after a drop of (°C)
-            <input type="number" min="0" max="20" step="0.5" bind:value={zone.hysteresis} /></label
-          >
-        </div>
-
-        {#if zone.id === 0 || zone.id === 1}
-          <CalibrationPanel {zone} />
-        {/if}
-
-        {#each zone.rules as rule, ri (ri)}
-          <div class="rule">
-            <div class="rule-head">
-              <label class="field"
-                >Temperature source
-                <select bind:value={rule.source}>
-                  {#if !sources.some((s) => s.id === rule.source)}
-                    <option value={rule.source}>{rule.source} (not found now)</option>
-                  {/if}
-                  {#each sources as s, i (i)}
-                    <option value={s.id}>{s.label}{s.celsius === null ? '' : ` — ${s.celsius}°C`}</option>
-                  {/each}
-                </select>
-              </label>
-              <button class="quiet" onclick={() => zone.rules.splice(ri, 1)}>Remove source</button>
-            </div>
-            <div class="mode" role="group" aria-label="How this source drives the fans">
-              <button
-                class:quiet={!!rule.target}
-                aria-pressed={!rule.target}
-                onclick={() => (rule.target = null)}>Follow the curve</button
-              >
-              <button
-                class:quiet={!rule.target}
-                aria-pressed={!!rule.target}
-                onclick={() =>
-                  (rule.target = rule.target ?? {
-                    celsius: defaultTarget(rule.source),
-                    reactivity: 'normal',
-                  })}>Hold a temperature</button
-              >
-            </div>
-            {#if rule.target}
-              <div class="target-fields">
-                <label class="field"
-                  >Target (°C)
-                  <input type="number" min="10" max="100" step="1" bind:value={rule.target.celsius} /></label
-                >
-                <label class="field"
-                  >Reactivity
-                  <select bind:value={rule.target.reactivity}>
-                    <option value="calm">Calm: slow, quiet changes</option>
-                    <option value="normal">Normal</option>
-                    <option value="reactive">Reactive: follows quickly</option>
-                  </select>
-                </label>
-                <p class="soft">
-                  Fans run at the lowest speed that keeps this source at {rule.target.celsius}°C. The curve is
-                  the starting point and the safety net: from {rule.target.celsius +
-                    safetyMargin(rule.source)}°C it applies again.
-                </p>
-              </div>
-            {/if}
-            <CurveEditor
-              bind:points={rule.curve}
-              probe={probeForSource(rule.source, diskKind)}
-              current={currentTemp(rule.source)}
-              minDuty={zone.min_duty}
-              maxDuty={zone.max_duty}
-              label={zone.name}
-              target={rule.target?.celsius ?? null}
-              safetyFrom={rule.target ? rule.target.celsius + safetyMargin(rule.source) : null}
-              actualDuty={liveDuty(zone.id, ri)}
-            />
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-4">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Name</legend>
+              <input class="input w-full" bind:value={zone.name} />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">IPMI zone</legend>
+              <select class="select w-full" bind:value={zone.id}>
+                <option value={0}>0 — CPU fans (FAN1…)</option>
+                <option value={1}>1 — Peripheral fans (FANA…)</option>
+                {#each [2, 3] as id (id)}<option value={id}>{id}</option>{/each}
+              </select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Minimum speed (%)</legend>
+              <input class="input w-full" type="number" min="0" max="100" bind:value={zone.min_duty} />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Maximum speed (%)</legend>
+              <input class="input w-full" type="number" min="0" max="100" bind:value={zone.max_duty} />
+            </fieldset>
+            <fieldset class="fieldset" title="How far the temperature must drop before the fans slow down">
+              <legend class="fieldset-legend">Slow down after a drop of (°C)</legend>
+              <input
+                class="input w-full"
+                type="number"
+                min="0"
+                max="20"
+                step="0.5"
+                bind:value={zone.hysteresis}
+              />
+            </fieldset>
           </div>
-        {:else}
-          <p class="soft">
-            No source: this zone is not controlled. Add a source to drive it from a temperature.
-          </p>
-        {/each}
-        <div><button class="quiet" onclick={() => addRule(zone)}>Add a source</button></div>
+
+          {#if zone.id === 0 || zone.id === 1}
+            <CalibrationPanel {zone} />
+          {/if}
+
+          {#each zone.rules as rule, ri (ri)}
+            <div class="grid gap-3 border-t border-base-300 pt-4">
+              <div class="flex flex-wrap items-end justify-between gap-4">
+                <fieldset class="fieldset max-w-105 flex-[1_1_260px]">
+                  <legend class="fieldset-legend">Temperature source</legend>
+                  <select class="select w-full" bind:value={rule.source}>
+                    {#if !sources.some((s) => s.id === rule.source)}
+                      <option value={rule.source}>{rule.source} (not found now)</option>
+                    {/if}
+                    {#each sources as s, i (i)}
+                      <option value={s.id}>{s.label}{s.celsius === null ? '' : ` — ${s.celsius}°C`}</option>
+                    {/each}
+                  </select>
+                </fieldset>
+                <button class="btn btn-ghost btn-sm mb-1" onclick={() => zone.rules.splice(ri, 1)}
+                  >Remove source</button
+                >
+              </div>
+              <div class="join" role="group" aria-label="How this source drives the fans">
+                <button
+                  class="btn join-item btn-sm {rule.target ? '' : 'btn-primary'}"
+                  aria-pressed={!rule.target}
+                  onclick={() => (rule.target = null)}>Follow the curve</button
+                >
+                <button
+                  class="btn join-item btn-sm {rule.target ? 'btn-primary' : ''}"
+                  aria-pressed={!!rule.target}
+                  onclick={() =>
+                    (rule.target = rule.target ?? {
+                      celsius: defaultTarget(rule.source),
+                      reactivity: 'normal',
+                    })}>Hold a temperature</button
+                >
+              </div>
+              {#if rule.target}
+                <div class="flex flex-wrap items-end gap-x-5 gap-y-2">
+                  <fieldset class="fieldset w-48">
+                    <legend class="fieldset-legend">Target (°C)</legend>
+                    <input
+                      class="input w-full"
+                      type="number"
+                      min="10"
+                      max="100"
+                      step="1"
+                      bind:value={rule.target.celsius}
+                    />
+                  </fieldset>
+                  <fieldset class="fieldset w-60">
+                    <legend class="fieldset-legend">Reactivity</legend>
+                    <select class="select w-full" bind:value={rule.target.reactivity}>
+                      <option value="calm">Calm: slow, quiet changes</option>
+                      <option value="normal">Normal</option>
+                      <option value="reactive">Reactive: follows quickly</option>
+                    </select>
+                  </fieldset>
+                  <p class="flex-[1_1_20rem] pb-2 text-sm text-base-content/70">
+                    Fans run at the lowest speed that keeps this source at {rule.target.celsius}°C. The curve
+                    is the starting point and the safety net: from {rule.target.celsius +
+                      safetyMargin(rule.source)}°C it applies again.
+                  </p>
+                </div>
+              {/if}
+              <CurveEditor
+                bind:points={rule.curve}
+                probe={probeForSource(rule.source, diskKind)}
+                current={currentTemp(rule.source)}
+                minDuty={zone.min_duty}
+                maxDuty={zone.max_duty}
+                label={zone.name}
+                target={rule.target?.celsius ?? null}
+                safetyFrom={rule.target ? rule.target.celsius + safetyMargin(rule.source) : null}
+                actualDuty={liveDuty(zone.id, ri)}
+              />
+            </div>
+          {:else}
+            <div role="status" class="alert alert-soft">
+              No source: this zone is not controlled. Add a source to drive it from a temperature.
+            </div>
+          {/each}
+          <div><button class="btn btn-sm" onclick={() => addRule(zone)}>Add a source</button></div>
+        </div>
       </section>
     {/each}
-    <div><button class="quiet" onclick={addZone}>Add a zone</button></div>
+    <div><button class="btn" onclick={addZone}>Add a zone</button></div>
   {:else}
-    <p class="soft">Loading…</p>
+    <p class="flex items-center gap-2 text-base-content/60">
+      <span class="loading loading-spinner loading-sm"></span> Loading…
+    </p>
   {/if}
 </div>
-
-<style>
-  .page {
-    display: grid;
-    gap: var(--gutter);
-  }
-
-  .intro {
-    display: grid;
-    gap: 0.5rem;
-    max-width: 70ch;
-  }
-
-  .zone {
-    display: grid;
-    gap: 1.25rem;
-  }
-
-  .zone-head,
-  .rule-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .rule {
-    display: grid;
-    gap: 0.8rem;
-    border-top: 1px solid var(--rule);
-    padding-top: 1.1rem;
-  }
-
-  .mode {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-
-  .target-fields {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 0.8rem 1.2rem;
-  }
-
-  .target-fields .field {
-    width: 12rem;
-  }
-
-  .target-fields p {
-    flex: 1 1 20rem;
-    font-size: var(--step--1);
-  }
-
-  .rule-head .field {
-    flex: 1 1 260px;
-    max-width: 420px;
-  }
-</style>

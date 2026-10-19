@@ -24,7 +24,7 @@ export function band(celsius: number | null | undefined, probe: Probe): Band | n
 
 export function thermalColor(celsius: number | null | undefined, probe: Probe): string {
   const b = band(celsius, probe)
-  return b ? `var(--${b})` : 'var(--rule)'
+  return b ? `var(--color-${b})` : 'var(--color-base-300)'
 }
 
 /** Probe type for a source id such as `cpu`, `disks:hdd` or `disk:SERIAL`. */

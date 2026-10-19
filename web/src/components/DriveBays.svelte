@@ -13,6 +13,18 @@
     t === null ? 0 : Math.max(4, Math.min(100, ((t - FLOOR) / (CEIL - FLOOR)) * 100))
 
   const kindLabel = { hdd: 'HDD', ssd: 'SSD', nvme: 'NVMe' } as const
+  const STATUS = {
+    ok: 'status-success',
+    warning: 'status-warning',
+    failing: 'status-error',
+    unknown: '',
+  } as const
+  const ALERT = {
+    ok: 'alert-success',
+    warning: 'alert-warning',
+    failing: 'alert-error',
+    unknown: '',
+  } as const
 
   let selectedSerial = $state<string | null>(null)
   const selected = $derived(disks.find((d) => d.serial === selectedSerial) ?? null)
@@ -35,40 +47,47 @@
 </script>
 
 {#if disks.length === 0}
-  <p class="soft">
+  <p class="text-base-content/60">
     No disk found. Check that smartctl and lsblk are installed, or the exclusion filter in Settings.
   </p>
 {:else}
-  <ul class="bays">
+  <ul class="grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-2.5">
     {#each disks as disk (disk.name)}
+      {@const level = disk.state === 'error' ? 'failing' : healthLevel(disk)}
       <li>
         <button
-          class="bay"
-          class:asleep={disk.state === 'standby'}
-          class:selected={disk.serial === selectedSerial}
+          class="group grid w-full cursor-pointer justify-items-center gap-0.5 rounded-box py-1 focus-visible:outline-2 focus-visible:outline-primary"
           aria-expanded={disk.serial === selectedSerial}
           aria-label="{disk.name}: {HEALTH_TEXT[healthLevel(disk)]}"
           onclick={() => (selectedSerial = selectedSerial === disk.serial ? null : disk.serial)}
         >
-          <span class="slot" aria-hidden="true">
+          <span
+            class="relative h-26 w-full max-w-14 overflow-hidden rounded border bg-base-200 transition-colors group-hover:border-base-content/50 {disk.serial ===
+            selectedSerial
+              ? 'border-base-content/60'
+              : 'border-base-300'}"
+            aria-hidden="true"
+          >
             <span
-              class="level"
+              class="absolute inset-x-0 bottom-0 transition-[height] duration-500 {disk.state === 'standby'
+                ? 'opacity-40'
+                : 'opacity-85'}"
               style:height="{fill(disk.temperature)}%"
-              style:background={thermalColor(disk.temperature, disk.kind)}
+              style:background-color={thermalColor(disk.temperature, disk.kind)}
             ></span>
-            <span class="led" data-health={disk.state === 'error' ? 'failing' : healthLevel(disk)}></span>
+            <span class="status absolute top-1.5 left-1.5 {STATUS[level]}"></span>
           </span>
-          <span class="reading figure">
+          <span class="mt-1 font-figures text-lg font-semibold tabular-nums">
             {#if disk.state === 'standby'}
-              <span class="soft">asleep</span>
+              <span class="font-sans text-xs font-normal text-base-content/60">asleep</span>
             {:else if disk.state === 'error'}
-              <span class="fault">no data</span>
+              <span class="font-sans text-xs font-normal text-error">no data</span>
             {:else}
               {disk.temperature}°
             {/if}
           </span>
-          <span class="name">{disk.name}</span>
-          <span class="kind soft">{kindLabel[disk.kind]}</span>
+          <span class="max-w-full truncate text-sm font-medium">{disk.name}</span>
+          <span class="text-xs text-base-content/60">{kindLabel[disk.kind]}</span>
         </button>
       </li>
     {/each}
@@ -76,225 +95,37 @@
 
   {#if selected}
     {@const level = healthLevel(selected)}
-    <div class="details" data-health={level}>
-      <p class="verdict"><span class="led" data-health={level}></span>{HEALTH_TEXT[level]}</p>
-      <dl>
-        <div>
-          <dt>Disk</dt>
-          <dd>{selected.name} — {selected.model || kindLabel[selected.kind]}</dd>
-        </div>
-        <div>
-          <dt>Serial</dt>
-          <dd>{selected.serial}</dd>
-        </div>
-        {#if selected.error}<div>
-            <dt>Error</dt>
-            <dd class="fault">{selected.error}</dd>
-          </div>{/if}
+    <div class="alert alert-soft {ALERT[level]} mt-2 grid-cols-1 items-start justify-items-stretch text-left">
+      <p class="flex items-center gap-2 font-semibold">
+        <span class="status {STATUS[level]}"></span>{HEALTH_TEXT[level]}
+      </p>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+        <dt class="text-base-content/60">Disk</dt>
+        <dd>{selected.name} — {selected.model || kindLabel[selected.kind]}</dd>
+        <dt class="text-base-content/60">Serial</dt>
+        <dd>{selected.serial}</dd>
+        {#if selected.error}
+          <dt class="text-base-content/60">Error</dt>
+          <dd class="text-error">{selected.error}</dd>
+        {/if}
         {#if selected.health?.passed !== null && selected.health?.passed !== undefined}
-          <div>
-            <dt>SMART self-assessment</dt>
-            <dd class:fault={!selected.health.passed}>{selected.health.passed ? 'Passed' : 'FAILED'}</dd>
-          </div>
+          <dt class="whitespace-nowrap text-base-content/60">SMART self-assessment</dt>
+          <dd class={selected.health.passed ? '' : 'font-semibold text-error'}>
+            {selected.health.passed ? 'Passed' : 'FAILED'}
+          </dd>
         {/if}
         {#if selected.health?.power_on_hours != null}
-          <div>
-            <dt>Powered on</dt>
-            <dd>
-              {powerOnText(selected.health.power_on_hours)}
-              <span class="soft">({selected.health.power_on_hours.toLocaleString()} h)</span>
-            </dd>
-          </div>
+          <dt class="text-base-content/60">Powered on</dt>
+          <dd>
+            {powerOnText(selected.health.power_on_hours)}
+            <span class="text-base-content/60">({selected.health.power_on_hours.toLocaleString()} h)</span>
+          </dd>
         {/if}
         {#each counters(selected) as row (row.label)}
-          <div>
-            <dt>{row.label}</dt>
-            <dd class="figure" class:warn={row.bad}>{row.value}</dd>
-          </div>
+          <dt class="whitespace-nowrap text-base-content/60">{row.label}</dt>
+          <dd class="font-figures font-semibold tabular-nums {row.bad ? 'text-warning' : ''}">{row.value}</dd>
         {/each}
       </dl>
     </div>
   {/if}
 {/if}
-
-<style>
-  .bays {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-    gap: 10px;
-  }
-
-  .bay {
-    all: unset;
-    box-sizing: border-box;
-    width: 100%;
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    min-width: 0;
-    padding: 4px 0;
-    border-radius: var(--radius-s);
-    cursor: pointer;
-  }
-
-  .bay:hover .slot,
-  .bay.selected .slot {
-    border-color: var(--ink-soft);
-  }
-
-  .bay:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  .slot {
-    position: relative;
-    width: 100%;
-    max-width: 58px;
-    height: 104px;
-    border-radius: 3px;
-    background:
-      repeating-linear-gradient(
-        0deg,
-        transparent 0 7px,
-        color-mix(in srgb, var(--rule) 55%, transparent) 7px 8px
-      ),
-      var(--panel-sunk);
-    border: 1px solid var(--rule);
-    overflow: hidden;
-  }
-
-  .level {
-    position: absolute;
-    inset: auto 0 0 0;
-    opacity: 0.85;
-    transition: height 0.6s ease;
-  }
-
-  .slot .led {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    box-shadow: 0 0 0 2px var(--panel-sunk);
-  }
-
-  .led {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--rule);
-  }
-
-  .led[data-health='ok'] {
-    background: var(--mild);
-  }
-
-  .led[data-health='warning'] {
-    background: var(--warm);
-  }
-
-  .led[data-health='failing'] {
-    background: var(--critical);
-  }
-
-  .asleep .level {
-    opacity: 0.4;
-  }
-
-  .reading {
-    font-size: var(--step-1);
-    margin-top: 4px;
-  }
-
-  .reading span {
-    font-family: var(--font);
-    font-weight: 400;
-    font-size: var(--step--1);
-  }
-
-  .fault {
-    color: var(--critical);
-  }
-
-  .name {
-    font-size: var(--step--1);
-    font-weight: 500;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .kind {
-    font-size: 0.75rem;
-  }
-
-  .details {
-    border-left: 4px solid var(--mild);
-    background: var(--panel-sunk);
-    border-radius: var(--radius-s);
-    padding: 0.8rem 1rem;
-    display: grid;
-    gap: 0.6rem;
-  }
-
-  .details[data-health='warning'] {
-    border-left-color: var(--warm);
-  }
-
-  .details[data-health='failing'] {
-    border-left-color: var(--critical);
-  }
-
-  .details[data-health='unknown'] {
-    border-left-color: var(--rule);
-  }
-
-  .verdict {
-    margin: 0;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .verdict .led {
-    width: 8px;
-    height: 8px;
-  }
-
-  dl {
-    margin: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-    gap: 0.4rem 1.5rem;
-  }
-
-  dl div {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    border-bottom: 1px solid var(--rule);
-    padding-bottom: 0.3rem;
-    min-width: 0;
-  }
-
-  dt {
-    color: var(--ink-soft);
-    white-space: nowrap;
-  }
-
-  dd {
-    margin: 0;
-    text-align: right;
-    overflow-wrap: anywhere;
-  }
-
-  dd.warn {
-    color: var(--hot);
-    font-weight: 600;
-  }
-</style>

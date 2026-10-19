@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // During `npm run dev`, API calls go to a backend started with
@@ -7,7 +8,7 @@ import { defineConfig } from 'vite'
 const backend = process.env.BACKEND ?? 'http://127.0.0.1:9495'
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [tailwindcss(), svelte()],
   server: {
     proxy: {
       '/api/live': { target: backend, ws: true },

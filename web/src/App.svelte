@@ -24,6 +24,7 @@
 
   let auth = $state<'loading' | 'setup' | 'login' | 'ok'>('loading')
   let route = $state(location.hash.replace(/^#\/?/, ''))
+  let drawerOpen = $state(false)
   const page = $derived(PAGES.find((p) => p.path === route) ?? PAGES[0])
   const snapshot = $derived(live.snapshot)
   const cpuRpm = $derived(Math.max(0, ...(snapshot?.fans.map((f) => f.rpm ?? 0) ?? [0])) || null)
@@ -51,7 +52,10 @@
   onMount(() => {
     setUnauthorizedHandler(() => (auth = 'login'))
     checkAuth()
-    const onHash = () => (route = location.hash.replace(/^#\/?/, ''))
+    const onHash = () => {
+      route = location.hash.replace(/^#\/?/, '')
+      drawerOpen = false
+    }
     window.addEventListener('hashchange', onHash)
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (configStore.dirty) e.preventDefault()
@@ -74,255 +78,113 @@
 {:else if auth !== 'ok'}
   <Login setup={auth === 'setup'} onDone={() => (auth = 'ok')} />
 {:else}
-  <div class="shell">
-    <nav aria-label="Sections">
-      <a class="brand" href="#/">
-        <Rotor rpm={cpuRpm} size={30} color="var(--warm)" />
-        <span>Fanwarden</span>
-      </a>
-      <ul>
-        {#each PAGES as p (p.path)}
-          <li>
-            <a href="#/{p.path}" aria-current={p === page ? 'page' : undefined}>
-              {p.label}
-              {#if p.path === 'alerts' && snapshot?.alerts.length}
-                <span class="count figure" aria-label="{snapshot.alerts.length} active"
-                  >{snapshot.alerts.length}</span
-                >
-              {/if}
-            </a>
-          </li>
-        {/each}
-      </ul>
-      <div class="status">
-        {#if updates.status?.available && updates.status.latest}
-          <a class="update" href="#/settings">Version {updates.status.latest.version} is available</a>
-        {/if}
-        {#if snapshot?.simulate}<p class="flag">Simulated hardware</p>{/if}
-        {#if snapshot?.dry_run}<p class="flag">Dry run: speeds are not applied</p>{/if}
-        <p class="soft">
-          <span class="link" class:up={live.connected}></span>
-          {live.connected ? 'Live' : 'Reconnecting…'}
-        </p>
-        <button class="quiet" onclick={logout}>Sign out</button>
-      </div>
-    </nav>
+  <div class="drawer lg:drawer-open min-h-dvh bg-base-200">
+    <input id="nav-drawer" type="checkbox" class="drawer-toggle" bind:checked={drawerOpen} />
 
-    <main>
-      <svelte:boundary>
-        <page.component />
-        {#snippet failed(error, reset)}
-          <div class="panel crash" role="alert">
-            <h1>This page stopped working</h1>
-            <p>{error instanceof Error ? error.message : String(error)}</p>
-            <p class="soft">The service keeps controlling the fans. Report this message if it comes back.</p>
-            <button onclick={reset}>Try again</button>
+    <div class="drawer-content flex min-w-0 flex-col">
+      <header class="navbar sticky top-0 z-20 border-b border-base-300 bg-base-100 lg:hidden">
+        <label for="nav-drawer" class="btn btn-square btn-ghost" aria-label="Open the menu">
+          <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="2"
+            ><path d="M4 6h16M4 12h16M4 18h16" /></svg
+          >
+        </label>
+        <a class="flex items-center gap-2 px-2 text-lg font-semibold" href="#/">
+          <Rotor rpm={cpuRpm} size={26} color="var(--color-accent)" />
+          Fanwarden
+        </a>
+        {#if snapshot?.alerts.length}
+          <a href="#/alerts" class="badge badge-error ml-auto font-figures">{snapshot.alerts.length}</a>
+        {/if}
+      </header>
+
+      <main class="mx-auto w-full max-w-7xl flex-1 p-4 pb-28 sm:p-6 lg:p-8 lg:pb-28">
+        <svelte:boundary>
+          <page.component />
+          {#snippet failed(error, reset)}
+            <div role="alert" class="alert alert-error flex-col items-start">
+              <h1 class="text-lg font-semibold">This page stopped working</h1>
+              <p>{error instanceof Error ? error.message : String(error)}</p>
+              <p class="opacity-80">
+                The service keeps controlling the fans. Report this message if it comes back.
+              </p>
+              <button class="btn btn-sm" onclick={reset}>Try again</button>
+            </div>
+          {/snippet}
+        </svelte:boundary>
+      </main>
+
+      {#if configStore.dirty || configStore.error}
+        <div role="region" aria-label="Unsaved changes" class="fixed inset-x-0 bottom-0 z-30 p-3 lg:left-60">
+          <div
+            class="alert mx-auto max-w-3xl shadow-lg {configStore.error
+              ? 'alert-error'
+              : 'border-base-300 bg-base-100'}"
+          >
+            <span>{configStore.error ? `Not saved: ${configStore.error}` : 'You have unsaved changes.'}</span>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm" onclick={() => configStore.discard()}>Discard</button>
+              <button
+                class="btn btn-primary btn-sm"
+                onclick={() => configStore.save()}
+                disabled={configStore.saving}
+              >
+                {#if configStore.saving}<span class="loading loading-spinner loading-xs"></span>{/if}
+                Save changes
+              </button>
+            </div>
           </div>
-        {/snippet}
-      </svelte:boundary>
-    </main>
-
-    {#if configStore.dirty || configStore.error}
-      <div class="savebar" role="region" aria-label="Unsaved changes">
-        {#if configStore.error}
-          <p class="error">Not saved: {configStore.error}</p>
-        {:else}
-          <p>You have unsaved changes.</p>
-        {/if}
-        <div class="actions">
-          <button class="quiet" onclick={() => configStore.discard()}>Discard</button>
-          <button onclick={() => configStore.save()} disabled={configStore.saving}>
-            {configStore.saving ? 'Saving…' : 'Save changes'}
-          </button>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
+
+    <div class="drawer-side z-40">
+      <label for="nav-drawer" aria-label="Close the menu" class="drawer-overlay"></label>
+      <nav
+        aria-label="Sections"
+        class="flex min-h-full w-60 flex-col gap-4 border-r border-base-300 bg-base-100 p-4"
+      >
+        <a class="flex items-center gap-2.5 px-2 text-lg font-semibold" href="#/">
+          <Rotor rpm={cpuRpm} size={30} color="var(--color-accent)" />
+          Fanwarden
+        </a>
+        <ul class="menu w-full gap-0.5 p-0">
+          {#each PAGES as p (p.path)}
+            <li>
+              <a
+                href="#/{p.path}"
+                class:menu-active={p === page}
+                aria-current={p === page ? 'page' : undefined}
+              >
+                {p.label}
+                {#if p.path === 'alerts' && snapshot?.alerts.length}
+                  <span
+                    class="badge badge-sm badge-error ml-auto font-figures"
+                    aria-label="{snapshot.alerts.length} active">{snapshot.alerts.length}</span
+                  >
+                {/if}
+              </a>
+            </li>
+          {/each}
+        </ul>
+
+        <div class="mt-auto flex flex-col gap-2 text-sm">
+          {#if updates.status?.available && updates.status.latest}
+            <a class="alert alert-success alert-soft px-3 py-2" href="#/settings"
+              >Version {updates.status.latest.version} is available</a
+            >
+          {/if}
+          {#if snapshot?.simulate}<span class="badge badge-warning badge-soft w-full">Simulated hardware</span
+            >{/if}
+          {#if snapshot?.dry_run}<span class="badge badge-warning badge-soft h-auto w-full py-1"
+              >Dry run: speeds are not applied</span
+            >{/if}
+          <span class="flex items-center gap-2 px-1 text-base-content/60">
+            <span class="status {live.connected ? 'status-success' : 'status-error'}"></span>
+            {live.connected ? 'Live' : 'Reconnecting…'}
+          </span>
+          <button class="btn btn-ghost btn-sm justify-start" onclick={logout}>Sign out</button>
+        </div>
+      </nav>
+    </div>
   </div>
 {/if}
-
-<style>
-  .shell {
-    display: grid;
-    grid-template-columns: 210px minmax(0, 1fr);
-    min-height: 100dvh;
-  }
-
-  nav {
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    padding: 1.25rem 1rem;
-    border-right: 1px solid var(--rule);
-    background: var(--panel-sunk);
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: var(--step-1);
-  }
-
-  nav ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 2px;
-  }
-
-  nav ul a {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.45rem 0.7rem;
-    border-radius: var(--radius-s);
-    text-decoration: none;
-    color: var(--ink-soft);
-    font-weight: 500;
-  }
-
-  nav ul a:hover {
-    color: var(--ink);
-  }
-
-  nav ul a[aria-current='page'] {
-    background: var(--panel);
-    color: var(--ink);
-    box-shadow: inset 3px 0 0 var(--warm);
-  }
-
-  .count {
-    background: var(--critical);
-    color: #fff;
-    border-radius: 999px;
-    min-width: 1.4rem;
-    text-align: center;
-    font-size: var(--step--1);
-    padding: 0 0.35rem;
-  }
-
-  .status {
-    margin-top: auto;
-    display: grid;
-    gap: 0.6rem;
-    font-size: var(--step--1);
-  }
-
-  .update {
-    color: var(--ink);
-    font-weight: 600;
-    border-left: 3px solid var(--mild);
-    padding-left: 0.5rem;
-  }
-
-  .flag {
-    color: var(--ink);
-    font-weight: 600;
-    border-left: 3px solid var(--warm);
-    padding-left: 0.5rem;
-  }
-
-  .link {
-    display: inline-block;
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--hot);
-    margin-right: 0.3rem;
-  }
-
-  .link.up {
-    background: var(--mild);
-  }
-
-  main {
-    padding: var(--gutter);
-    padding-bottom: calc(var(--gutter) + 5rem);
-    max-width: 1280px;
-    width: 100%;
-  }
-
-  .crash {
-    display: grid;
-    gap: 0.75rem;
-    justify-items: start;
-    border-color: var(--critical);
-  }
-
-  .savebar {
-    position: fixed;
-    left: 50%;
-    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
-    width: min(calc(100% - 2rem), 640px);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: var(--control);
-    color: var(--control-ink);
-    border-radius: var(--radius-m);
-    box-shadow: 0 8px 30px rgb(0 0 0 / 0.25);
-  }
-
-  .savebar .actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .savebar button {
-    background: var(--control-ink);
-    color: var(--control);
-    border-color: var(--control-ink);
-  }
-
-  .savebar button.quiet {
-    background: transparent;
-    color: var(--control-ink);
-    border-color: color-mix(in srgb, var(--control-ink) 40%, transparent);
-  }
-
-  .savebar .error {
-    color: #ffb4a8;
-  }
-
-  @media (max-width: 760px) {
-    .shell {
-      grid-template-columns: 1fr;
-    }
-
-    nav {
-      position: static;
-      height: auto;
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.75rem 1rem;
-      border-right: 0;
-      border-bottom: 1px solid var(--rule);
-      padding: 0.75rem var(--gutter);
-    }
-
-    nav ul {
-      display: flex;
-      flex-wrap: wrap;
-      order: 3;
-      width: 100%;
-    }
-
-    .status {
-      margin: 0 0 0 auto;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-  }
-</style>

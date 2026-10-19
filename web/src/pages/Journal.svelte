@@ -28,35 +28,31 @@
   const time = (ts: number) => new Date(ts * 1000).toLocaleString()
 </script>
 
-<div class="page">
-  <header class="head">
-    <h1>Journal</h1>
-    <div role="group" aria-label="What to show" class="filters">
-      <button
-        class:quiet={view !== 'events'}
-        aria-pressed={view === 'events'}
-        onclick={() => (view = 'events')}>Events</button
-      >
-      <button class:quiet={view !== 'bmc'} aria-pressed={view === 'bmc'} onclick={() => (view = 'bmc')}
-        >BMC hardware log</button
-      >
-      <button
-        class:quiet={view !== 'config'}
-        aria-pressed={view === 'config'}
-        onclick={() => (view = 'config')}>Configuration changes</button
-      >
+<div class="grid gap-6">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-2xl font-semibold">Journal</h1>
+    <div role="group" aria-label="What to show" class="tabs tabs-box tabs-sm">
+      {#each [['events', 'Events'], ['bmc', 'BMC hardware log'], ['config', 'Configuration changes']] as const as [key, text] (key)}
+        <button
+          class="tab {view === key ? 'tab-active' : ''}"
+          aria-pressed={view === key}
+          onclick={() => (view = key)}>{text}</button
+        >
+      {/each}
     </div>
   </header>
 
   {#if view === 'config'}
     <ConfigHistory />
   {:else}
-    <div role="group" aria-label="Filter" class="filters">
-      <button class:quiet={filter !== 'all'} aria-pressed={filter === 'all'} onclick={() => (filter = 'all')}
-        >Everything</button
+    <div role="group" aria-label="Filter" class="join">
+      <button
+        class="btn join-item btn-sm {filter === 'all' ? 'btn-primary' : ''}"
+        aria-pressed={filter === 'all'}
+        onclick={() => (filter = 'all')}>Everything</button
       >
       <button
-        class:quiet={filter !== 'problems'}
+        class="btn join-item btn-sm {filter === 'problems' ? 'btn-primary' : ''}"
         aria-pressed={filter === 'problems'}
         onclick={() => (filter = 'problems')}>Warnings and errors</button
       >
@@ -65,71 +61,25 @@
     {#if view === 'bmc'}
       <BmcEvents {filter} />
     {:else}
-      <ol class="panel log">
+      <ol class="list rounded-box border border-base-300 bg-base-100 [overflow-wrap:anywhere]">
         {#each shown as event (event.id)}
-          <li data-level={event.level}>
-            <time class="soft figure">{time(event.ts)}</time>
-            <span>{event.message}</span>
+          <li class="list-row items-center py-2.5">
+            <span
+              class="status {event.level === 'error'
+                ? 'status-error'
+                : event.level === 'warn'
+                  ? 'status-warning'
+                  : 'status-neutral'}"
+            ></span>
+            <div class="list-col-grow grid gap-x-4 sm:grid-cols-[11.5rem_1fr]">
+              <time class="font-figures text-sm text-base-content/60 tabular-nums">{time(event.ts)}</time>
+              <span>{event.message}</span>
+            </div>
           </li>
         {:else}
-          <li class="soft">Nothing recorded since the service started.</li>
+          <li class="list-row text-base-content/60">Nothing recorded since the service started.</li>
         {/each}
       </ol>
     {/if}
   {/if}
 </div>
-
-<style>
-  .page {
-    display: grid;
-    gap: var(--gutter);
-  }
-
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .filters {
-    display: flex;
-    gap: 0.35rem;
-  }
-
-  .log {
-    list-style: none;
-    margin: 0;
-    display: grid;
-    gap: 0.45rem;
-    overflow-wrap: anywhere;
-  }
-
-  .log li {
-    display: grid;
-    grid-template-columns: 11.5rem 1fr;
-    gap: 1rem;
-    padding-left: 0.6rem;
-    border-left: 3px solid transparent;
-  }
-
-  .log li[data-level='warn'] {
-    border-left-color: var(--warm);
-  }
-
-  .log li[data-level='error'] {
-    border-left-color: var(--critical);
-  }
-
-  .log time {
-    font-weight: 500;
-  }
-
-  @media (max-width: 560px) {
-    .log li {
-      grid-template-columns: 1fr;
-      gap: 0;
-    }
-  }
-</style>

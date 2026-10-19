@@ -55,13 +55,13 @@
   }
 </script>
 
-<div class="page">
-  <header class="head">
-    <h1>History</h1>
-    <div class="ranges" role="group" aria-label="Time range">
+<div class="grid gap-6">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-2xl font-semibold">History</h1>
+    <div class="tabs tabs-box tabs-sm" role="group" aria-label="Time range">
       {#each RANGES as r (r.seconds)}
         <button
-          class:quiet={range !== r.seconds}
+          class="tab {range === r.seconds ? 'tab-active' : ''}"
           aria-pressed={range === r.seconds}
           onclick={() => (range = r.seconds)}>{r.label}</button
         >
@@ -70,65 +70,28 @@
   </header>
 
   {#if error}
-    <p class="error">Cannot load the history: {error}</p>
+    <div role="alert" class="alert alert-error alert-soft">Cannot load the history: {error}</div>
   {:else if !data}
-    <p class="soft">Loading…</p>
+    <p class="flex items-center gap-2 text-base-content/60">
+      <span class="loading loading-spinner loading-sm"></span> Loading…
+    </p>
   {:else if data.temps.timestamps.length === 0}
-    <p class="soft">No data for this period yet. Readings are recorded at every control cycle.</p>
+    <div role="status" class="alert alert-soft">
+      No data for this period yet. Readings are recorded at every control cycle.
+    </div>
   {:else}
-    <section class="panel">
-      <h2>CPU and board</h2>
-      <Chart data={data.temps} {label} unit="°C" />
-    </section>
-    {#if data.disks.series.length}
-      <section class="panel">
-        <h2>Disks</h2>
-        <Chart data={data.disks} {label} unit="°C" />
+    {#snippet chart(title: string, series: HistoryData, unit: string)}
+      <section class="card border border-base-300 bg-base-100">
+        <div class="card-body">
+          <h2 class="card-title">{title}</h2>
+          <Chart data={series} {label} {unit} />
+        </div>
       </section>
-    {/if}
-    <section class="panel">
-      <h2>Zone speed</h2>
-      <Chart data={data.duty} {label} unit="%" />
-    </section>
-    <section class="panel">
-      <h2>Fans</h2>
-      <Chart data={data.fans} {label} unit=" rpm" />
-    </section>
-    {#if data.power.series.length}
-      <section class="panel">
-        <h2>Power</h2>
-        <Chart data={data.power} {label} unit=" W" />
-      </section>
-    {/if}
+    {/snippet}
+    {@render chart('CPU and board', data.temps, '°C')}
+    {#if data.disks.series.length}{@render chart('Disks', data.disks, '°C')}{/if}
+    {@render chart('Zone speed', data.duty, '%')}
+    {@render chart('Fans', data.fans, ' rpm')}
+    {#if data.power.series.length}{@render chart('Power', data.power, ' W')}{/if}
   {/if}
 </div>
-
-<style>
-  .page {
-    display: grid;
-    gap: var(--gutter);
-  }
-
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .ranges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-
-  section.panel {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .error {
-    color: var(--critical);
-  }
-</style>
