@@ -71,6 +71,8 @@ pub struct Snapshot {
     pub bmc_error: Option<String>,
     pub sensors: SensorData,
     pub fans: Vec<FanReading>,
+    /// Power draw of the server, from DCMI or the power supply sensors.
+    pub power_watts: Option<f32>,
     pub zones: Vec<ZoneStatus>,
     pub sources: Vec<SourceOption>,
     pub alerts: Vec<ActiveAlert>,

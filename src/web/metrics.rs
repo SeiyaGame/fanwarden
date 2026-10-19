@@ -100,6 +100,11 @@ pub fn render(s: &Snapshot) -> String {
             })
             .collect(),
     );
+    gauge(
+        "power_watts",
+        "Power draw of the server (DCMI or power supply sensors)",
+        s.power_watts.map(|w| (String::new(), w as f64)).into_iter().collect(),
+    );
     gauge("active_alerts", "Number of active alerts", vec![(String::new(), s.alerts.len() as f64)]);
     gauge(
         "bmc_up",
@@ -118,6 +123,7 @@ mod tests {
     fn renders_metrics() {
         let mut s = Snapshot::default();
         s.sensors.cpu = Some(41.0);
+        s.power_watts = Some(112.0);
         s.fans = vec![
             FanReading { name: "FAN1".into(), rpm: Some(700), status: "ok".into() },
             FanReading { name: "FAN4".into(), rpm: None, status: "ns".into() },
@@ -140,5 +146,6 @@ mod tests {
         assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN1\"} 700\n"));
         assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN4\"} -1\n"));
         assert!(text.contains("fanwarden_bmc_up 1\n"));
+        assert!(text.contains("fanwarden_power_watts 112\n"));
     }
 }

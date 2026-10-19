@@ -62,4 +62,11 @@ impl Bmc {
             Bmc::Sim(_) => Ok(crate::sim::SEL_LIST.to_string()),
         }
     }
+
+    pub async fn power_reading(&self) -> anyhow::Result<Option<f32>> {
+        match self {
+            Bmc::Ipmi(tool) => tool.power_reading().await,
+            Bmc::Sim(sim) => Ok(Some(sim.lock().unwrap().power())),
+        }
+    }
 }

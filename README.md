@@ -25,6 +25,8 @@ that accepts the X10/X11/X12/H11/H12 fan commands (`raw 0x30 0x70 0x66`).
   Journal, with an alert for each new warning or failure.
 - Alerts (hot CPU or disk, stopped or slowing fan, failing disk or SMART errors going up, BMC
   hardware event, unreachable BMC) sent to Discord, ntfy, Gotify or any webhook.
+- Power draw of the server (IPMI DCMI, or the power supply sensors): on the overview, in the history and
+  in the metrics.
 - Prometheus metrics on `/metrics`.
 - Local BMC (`/dev/ipmi0`) or remote BMC over the network (IPMI over LAN).
 

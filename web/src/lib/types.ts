@@ -100,6 +100,8 @@ export interface Snapshot {
   dry_run: boolean
   fan_mode: FanMode | null
   bmc_error: string | null
+  /** Power draw from DCMI or the power supply sensors. */
+  power_watts: number | null
   sensors: {
     cpu: number | null
     hwmon: { chip: string; label: string; celsius: number }[]

@@ -28,6 +28,8 @@ pub struct TempReading {
 pub struct SdrReadings {
     pub fans: Vec<FanReading>,
     pub temperatures: Vec<TempReading>,
+    /// Sum of the power supply input sensors (`PS1 Input Power`, `PIN`...), when the board has some.
+    pub input_watts: Option<f32>,
 }
 
 #[derive(Clone)]
@@ -121,6 +123,11 @@ impl IpmiTool {
         self.call_within(&["sel", "elist"], SEL_LIST_TIMEOUT).await
     }
 
+    /// Power draw from DCMI. `None` when the BMC has power readings turned off.
+    pub async fn power_reading(&self) -> anyhow::Result<Option<f32>> {
+        Ok(parse_dcmi_power(&self.call(&["dcmi", "power", "reading"]).await?))
+    }
+
     /// Synchronous variant of [`set_fan_mode`], usable from a panic hook.
     pub fn set_fan_mode_blocking(&self, mode: FanMode) -> anyhow::Result<()> {
         let mut args = self.base_args();
@@ -163,9 +170,23 @@ pub fn parse_sdr(text: &str) -> SdrReadings {
             readings
                 .temperatures
                 .push(TempReading { name: name.to_string(), celsius: number.filter(|_| unit == "degrees C") });
+        } else if unit == "Watts"
+            && (upper.contains("INPUT") || upper.contains("PIN"))
+            && let Some(watts) = number
+        {
+            *readings.input_watts.get_or_insert(0.0) += watts;
         }
     }
     readings
+}
+
+/// Instantaneous reading of `ipmitool dcmi power reading`.
+pub fn parse_dcmi_power(text: &str) -> Option<f32> {
+    if text.lines().any(|l| l.contains("Power reading state is") && l.contains("deactivated")) {
+        return None;
+    }
+    let line = text.lines().find(|l| l.trim_start().starts_with("Instantaneous power reading"))?;
+    line.split(':').nth(1)?.split_whitespace().next()?.parse().ok()
 }
 
 #[cfg(test)]
@@ -183,6 +204,9 @@ FAN4             | no reading        | ns
 FANA             | 1000 RPM          | ok
 12V              | 12.19 Volts       | ok
 PS1 Status       | 0x01              | ok
+PS1 Input Power  | 118 Watts         | ok
+PS2 Input Power  | 6 Watts           | ok
+PS1 Output Power | 101 Watts         | ok
 ";
 
     #[test]
@@ -195,6 +219,24 @@ PS1 Status       | 0x01              | ok
         assert_eq!(r.temperatures.len(), 4);
         assert_eq!(r.temperatures[0].celsius, Some(34.0));
         assert_eq!(r.temperatures[3].celsius, None);
+        assert_eq!(r.input_watts, Some(124.0));
+        assert_eq!(parse_sdr("FAN1 | 700 RPM | ok").input_watts, None);
+    }
+
+    #[test]
+    fn parses_dcmi_power() {
+        let text = "
+    Instantaneous power reading:                   112 Watts
+    Minimum during sampling period:                 87 Watts
+    Maximum during sampling period:                245 Watts
+    Average power reading over sample period:      110 Watts
+    IPMI timestamp:                           Mon Oct 19 14:00:00 2026
+    Sampling period:                          00000005 Seconds.
+    Power reading state is:                   activated
+";
+        assert_eq!(parse_dcmi_power(text), Some(112.0));
+        assert_eq!(parse_dcmi_power(&text.replace("activated", "deactivated")), None);
+        assert_eq!(parse_dcmi_power("DCMI request failed because: Invalid command (c1)"), None);
     }
 
     #[test]
