@@ -19,11 +19,11 @@
     failing: 'status-error',
     unknown: '',
   } as const
-  const ALERT = {
-    ok: 'alert-success',
-    warning: 'alert-warning',
-    failing: 'alert-error',
-    unknown: '',
+  const BOX = {
+    ok: 'border-success/40 bg-success/5',
+    warning: 'border-warning/60 bg-warning/10',
+    failing: 'border-error/60 bg-error/10',
+    unknown: 'border-base-300 bg-base-200',
   } as const
 
   let selectedSerial = $state<string | null>(null)
@@ -95,36 +95,52 @@
 
   {#if selected}
     {@const level = healthLevel(selected)}
-    <div class="alert alert-soft {ALERT[level]} mt-2 grid-cols-1 items-start justify-items-stretch text-left">
+    <div class="mt-2 grid gap-3 rounded-box border p-4 {BOX[level]}">
       <p class="flex items-center gap-2 font-semibold">
         <span class="status {STATUS[level]}"></span>{HEALTH_TEXT[level]}
       </p>
-      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt class="text-base-content/60">Disk</dt>
-        <dd>{selected.name} — {selected.model || kindLabel[selected.kind]}</dd>
-        <dt class="text-base-content/60">Serial</dt>
-        <dd>{selected.serial}</dd>
-        {#if selected.error}
-          <dt class="text-base-content/60">Error</dt>
-          <dd class="text-error">{selected.error}</dd>
-        {/if}
+      <dl class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-6 gap-y-3">
+        <div class="col-span-full sm:col-span-2">
+          <dt class="text-xs text-base-content/60">Disk</dt>
+          <dd class="font-medium">{selected.name} — {selected.model || kindLabel[selected.kind]}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-base-content/60">Serial</dt>
+          <dd class="font-mono text-sm">{selected.serial}</dd>
+        </div>
         {#if selected.health?.passed !== null && selected.health?.passed !== undefined}
-          <dt class="whitespace-nowrap text-base-content/60">SMART self-assessment</dt>
-          <dd class={selected.health.passed ? '' : 'font-semibold text-error'}>
-            {selected.health.passed ? 'Passed' : 'FAILED'}
-          </dd>
+          <div>
+            <dt class="text-xs text-base-content/60">SMART self-assessment</dt>
+            <dd class={selected.health.passed ? 'font-medium' : 'font-semibold text-error'}>
+              {selected.health.passed ? 'Passed' : 'FAILED'}
+            </dd>
+          </div>
         {/if}
         {#if selected.health?.power_on_hours != null}
-          <dt class="text-base-content/60">Powered on</dt>
-          <dd>
-            {powerOnText(selected.health.power_on_hours)}
-            <span class="text-base-content/60">({selected.health.power_on_hours.toLocaleString()} h)</span>
-          </dd>
+          <div>
+            <dt class="text-xs text-base-content/60">Powered on</dt>
+            <dd class="font-medium">
+              {powerOnText(selected.health.power_on_hours)}
+              <span class="text-sm font-normal text-base-content/60"
+                >({selected.health.power_on_hours.toLocaleString()} h)</span
+              >
+            </dd>
+          </div>
         {/if}
         {#each counters(selected) as row (row.label)}
-          <dt class="whitespace-nowrap text-base-content/60">{row.label}</dt>
-          <dd class="font-figures font-semibold tabular-nums {row.bad ? 'text-warning' : ''}">{row.value}</dd>
+          <div>
+            <dt class="text-xs text-base-content/60">{row.label}</dt>
+            <dd class="font-figures text-lg font-semibold tabular-nums {row.bad ? 'text-warning' : ''}">
+              {row.value}
+            </dd>
+          </div>
         {/each}
+        {#if selected.error}
+          <div class="col-span-full">
+            <dt class="text-xs text-base-content/60">Error</dt>
+            <dd class="text-error">{selected.error}</dd>
+          </div>
+        {/if}
       </dl>
     </div>
   {/if}
