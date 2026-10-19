@@ -41,6 +41,9 @@ updates:
       # Follows the Node major used by the CI and the Dockerfile
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
+      # TypeScript 7: wait until svelte-check and typescript-eslint accept it (peer dependencies)
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
