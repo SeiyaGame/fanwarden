@@ -26,9 +26,10 @@ commit_parsers = [
   { message = "^perf", group = "<!-- 2 -->Performance" },
   { message = "^refactor", group = "<!-- 3 -->Refactoring" },
   { message = "^docs?", group = "<!-- 4 -->Documentation" },
+  { message = '^(build|ci)\(deps\)', group = "<!-- 6 -->Dependencies" },
   { message = "^(build|ci)", group = "<!-- 5 -->Build and CI" },
   { message = '^chore\(release\)', skip = true },
-  { message = ".*", group = "<!-- 6 -->Other" },
+  { message = ".*", group = "<!-- 7 -->Other" },
 ]
 tag_pattern = "v[0-9].*"
 sort_commits = "oldest"
