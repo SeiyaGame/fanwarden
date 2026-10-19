@@ -1,0 +1,17 @@
+name: PR title
+
+# PRs are squash-merged: the title becomes the commit read by git-cliff (feat:, fix(ui):, ...)
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  conventional:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: >-
+          grep -qE '^[a-z]+(\(.+\))?!?: ' <<< "$TITLE"
+        env:
+          TITLE: ${{ github.event.pull_request.title }}

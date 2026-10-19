@@ -149,7 +149,8 @@ tests/api.rs      HTTP API tests
 Releases: push a `v*` tag, CI builds the static binary, attaches it to the GitHub release and writes
 the release notes from the commits since the previous tag ([git-cliff](https://git-cliff.org), see
 `cliff.toml`). Commits follow [Conventional Commits](https://www.conventionalcommits.org): `feat:`,
-`fix:`, `perf:`, `refactor:`, `docs:`, `build:`/`ci:`, `chore:`.
+`fix:`, `perf:`, `refactor:`, `docs:`, `build:`/`ci:`, `chore:`. PRs are squash-merged, so their
+title must follow the same format (checked by the CI).
 
 ## License
 
