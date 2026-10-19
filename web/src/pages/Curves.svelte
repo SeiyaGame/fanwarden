@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CalibrationPanel from '../components/CalibrationPanel.svelte'
   import CurveEditor from '../components/CurveEditor.svelte'
   import { configStore } from '../lib/configStore.svelte'
   import { live } from '../lib/live.svelte'
@@ -96,6 +97,10 @@
             <input type="number" min="0" max="20" step="0.5" bind:value={zone.hysteresis} /></label
           >
         </div>
+
+        {#if zone.id === 0 || zone.id === 1}
+          <CalibrationPanel {zone} />
+        {/if}
 
         {#each zone.rules as rule, ri (ri)}
           <div class="rule">

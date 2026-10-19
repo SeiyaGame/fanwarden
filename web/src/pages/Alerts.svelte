@@ -75,6 +75,12 @@
         <OptionalNumber bind:value={config.alerts.nvme_high} label="NVMe above" unit="°C" fallback={70} />
         <OptionalNumber bind:value={config.alerts.disk_low} label="Disk below" unit="°C" fallback={10} />
         <OptionalNumber bind:value={config.alerts.fan_min_rpm} label="Fan below" unit="RPM" fallback={150} />
+        <OptionalNumber
+          bind:value={config.alerts.fan_slowdown_percent}
+          label="Fan slower than at its calibration by"
+          unit="%"
+          fallback={15}
+        />
         <label class="field"
           >BMC unreachable after (failed commands)
           <input type="number" min="0" bind:value={config.alerts.ipmi_failures} /></label
@@ -82,6 +88,10 @@
         <label class="field"
           >Repeat an alert every (minutes, 0 = never)
           <input type="number" min="0" bind:value={config.alerts.repeat_minutes} /></label
+        >
+        <label class="check"
+          ><input type="checkbox" bind:checked={config.alerts.smart_health} /> Disk failing, or its SMART error
+          counters going up</label
         >
         <label class="check"
           ><input type="checkbox" bind:checked={config.alerts.notify_resolved} /> Notify when an alert clears</label

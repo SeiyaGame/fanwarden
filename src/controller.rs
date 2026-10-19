@@ -1,6 +1,6 @@
 //! Control loop: read sensors, compute zone duties, apply them to the BMC.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -9,9 +9,10 @@ use tokio::sync::watch;
 
 use crate::alerts::{AlertManager, Inputs};
 use crate::bmc::Bmc;
+use crate::calibration::{self, SlowFan};
 use crate::config::{Config, FanMode, Ipmi, Regulation, Zone};
 use crate::curve::next_duty;
-use crate::ipmi::{IpmiTool, SdrReadings};
+use crate::ipmi::{FanReading, IpmiTool, SdrReadings};
 use crate::regulator::{Gains, Inertia, Regulator};
 use crate::sensors::{self, DiskInfo, Reading, SensorData, Source};
 use crate::sim::Simulator;
@@ -20,6 +21,14 @@ use crate::state::{AppState, RuleStatus, Snapshot, ZoneMode, ZoneStatus};
 const HWMON_ROOT: &str = "/sys/class/hwmon";
 /// Check the BMC fan mode every N iterations (a BMC reset puts it back to its default).
 const MODE_CHECK_EVERY: u64 = 6;
+/// Fan speeds are compared with the calibration once the duty has stayed within this many
+/// percent for this long...
+const STABLE_DUTY_TOLERANCE: u8 = 2;
+const STABLE_DUTY_FOR: Duration = Duration::from_secs(30);
+/// ...and a fan is reported slow after this many cycles in a row.
+const SLOW_CYCLES: u32 = 3;
+/// Fans stopped by a calibration need a moment to spin up again: no "stopped fan" alert meanwhile.
+const FAN_ALERT_GRACE: Duration = Duration::from_secs(30);
 
 /// What a rule remembers between two cycles.
 #[derive(Debug, Clone, Default)]
@@ -128,6 +137,13 @@ pub struct Controller {
     alerts: AlertManager,
     iteration: u64,
     last_prune: Option<Instant>,
+    /// Zone swept by a calibration during the previous cycle.
+    calibrating: Option<u8>,
+    calibration_ended: Option<Instant>,
+    /// Per zone: duty the speed comparison is anchored to, and since when.
+    stable: HashMap<u8, (u8, Instant)>,
+    /// Consecutive cycles each fan was found slower than its calibration.
+    slow_counts: HashMap<String, u32>,
 }
 
 impl Controller {
@@ -138,6 +154,7 @@ impl Controller {
             Some(sim) => Bmc::Sim(sim.clone()),
             None => Bmc::Ipmi(IpmiTool::new(config.ipmi.clone())),
         };
+        *state.bmc.write().unwrap() = Some(bmc.clone());
         Self {
             state,
             sim,
@@ -153,6 +170,10 @@ impl Controller {
             alerts: AlertManager::default(),
             iteration: 0,
             last_prune: None,
+            calibrating: None,
+            calibration_ended: None,
+            stable: HashMap::new(),
+            slow_counts: HashMap::new(),
         }
     }
 
@@ -192,6 +213,7 @@ impl Controller {
         if self.sim.is_none() && config.ipmi != self.bmc_config {
             tracing::info!("IPMI settings changed, reconnecting");
             self.bmc = Bmc::Ipmi(IpmiTool::new(config.ipmi.clone()));
+            *self.state.bmc.write().unwrap() = Some(self.bmc.clone());
             self.bmc_config = config.ipmi.clone();
             self.fan_mode = None;
             self.applied.clear();
@@ -219,10 +241,17 @@ impl Controller {
             .clamp(1.0, 300.0);
         self.last_cycle = Some(Instant::now());
         let manual = self.state.manual.lock().unwrap().clone();
+        // A calibration drives its zone itself; once it ends, the zone gets its duty again at once.
+        let calibrating = self.state.calibration().and_then(|c| c.running_zone());
+        if let Some(previous) = self.calibrating.filter(|z| calibrating.map(|(id, _)| id) != Some(*z)) {
+            self.applied.remove(&previous);
+            self.calibration_ended = Some(Instant::now());
+        }
+        self.calibrating = calibrating.map(|(id, _)| id);
         let mut zones = Vec::with_capacity(config.zones.len());
         for zone in &config.zones {
             let memory = self.memory.entry(zone.id).or_default();
-            let status = compute_zone(
+            let mut status = compute_zone(
                 zone,
                 &data,
                 manual.get(&zone.id).copied(),
@@ -231,16 +260,29 @@ impl Controller {
                 dt,
                 &config.regulation,
             );
-            if let Some(duty) = status.duty {
+            if let Some((_, duty)) = calibrating.filter(|(id, _)| *id == zone.id) {
+                status.mode = ZoneMode::Calibrating;
+                status.duty = Some(duty);
+            } else if let Some(duty) = status.duty {
                 self.apply(config, &status, duty, dry_run).await;
             }
             zones.push(status);
         }
 
-        let failsafe_zones = zones.iter().filter(|z| z.mode == ZoneMode::Failsafe).map(|z| z.name.clone()).collect();
-        let inputs = Inputs { sensors: &data, fans: &sdr.fans, bmc_failures: self.bmc_failures, failsafe_zones };
-        let conditions = self.alerts.conditions(&config.alerts, &inputs);
         let now = crate::now();
+        let slow_fans = self.slow_fans(config, &zones, &sdr.fans, dry_run);
+        let failsafe_zones = zones.iter().filter(|z| z.mode == ZoneMode::Failsafe).map(|z| z.name.clone()).collect();
+        let inputs = Inputs {
+            now,
+            sensors: &data,
+            fans: &sdr.fans,
+            bmc_failures: self.bmc_failures,
+            failsafe_zones,
+            pause_fan_alerts: calibrating.is_some()
+                || self.calibration_ended.is_some_and(|t| t.elapsed() < FAN_ALERT_GRACE),
+            slow_fans,
+        };
+        let conditions = self.alerts.conditions(&config.alerts, &inputs);
         let notifications = self.alerts.update(&config.alerts, conditions, now);
         if !notifications.is_empty() && !config.notifications.is_empty() {
             let (notifier, channels) = (self.state.notifier.clone(), config.notifications.clone());
@@ -265,7 +307,41 @@ impl Controller {
             fans: sdr.fans,
             zones,
             alerts: self.alerts.active(),
+            calibration: self.state.calibration(),
+            references: self.state.references(),
         });
+    }
+
+    /// Fans turning slower than at their calibration, at a duty that has been stable for a while.
+    fn slow_fans(&mut self, config: &Config, zones: &[ZoneStatus], fans: &[FanReading], dry_run: bool) -> Vec<SlowFan> {
+        // Without Full mode, or in dry-run, the fans do not run at the duty we computed.
+        let Some(percent) =
+            config.alerts.fan_slowdown_percent.filter(|_| !dry_run && self.fan_mode == Some(FanMode::Full))
+        else {
+            self.slow_counts.clear();
+            return Vec::new();
+        };
+        let references = self.state.references();
+        let mut found = Vec::new();
+        for zone in zones {
+            let Some(duty) = zone.duty else { continue };
+            let anchor = self.stable.entry(zone.id).or_insert((duty, Instant::now()));
+            if duty.abs_diff(anchor.0) > STABLE_DUTY_TOLERANCE {
+                *anchor = (duty, Instant::now());
+            }
+            if zone.mode == ZoneMode::Calibrating || anchor.1.elapsed() < STABLE_DUTY_FOR {
+                continue;
+            }
+            if let Some(reference) = references.get(&zone.id) {
+                found.extend(calibration::slow_fans(reference, duty, fans, percent));
+            }
+        }
+        let names: HashSet<&str> = found.iter().map(|f| f.name.as_str()).collect();
+        self.slow_counts.retain(|name, _| names.contains(name.as_str()));
+        for fan in &found {
+            *self.slow_counts.entry(fan.name.clone()).or_default() += 1;
+        }
+        found.into_iter().filter(|f| self.slow_counts[&f.name] >= SLOW_CYCLES).collect()
     }
 
     fn read_sensors(&self, config: &Config, sdr: &SdrReadings) -> SensorData {
@@ -424,11 +500,12 @@ async fn disk_task(state: Arc<AppState>, cache: Arc<Mutex<DiskCache>>, mut shutd
         let config = state.config();
         if config.disks.enabled {
             match sensors::disks::scan(&config.disks).await {
-                Ok(disks) => {
+                Ok(mut disks) => {
                     if last_error.take().is_some() {
                         tracing::info!("disk scan working again");
                     }
                     let mut cache = cache.lock().unwrap();
+                    sensors::disks::keep_known_health(&cache.disks, &mut disks);
                     cache.disks = disks;
                     cache.updated = Some(Instant::now());
                 }
@@ -482,6 +559,7 @@ mod tests {
                     state,
                     temperature,
                     error: None,
+                    health: None,
                 })
                 .collect(),
             disks_fresh: true,

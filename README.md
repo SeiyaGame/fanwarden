@@ -13,8 +13,14 @@ that accepts the X10/X11/X12/H11/H12 fan commands (`raw 0x30 0x70 0x66`).
   The zone runs at the highest speed its sources ask for, with hysteresis and min/max limits.
 - If a source cannot be read, the zone goes to the failsafe speed (100% by default). When the service
   stops or crashes, fans are handed back to the BMC.
+- Disk health from SMART (self-assessment, reallocated and pending sectors, CRC and media errors, wear,
+  power-on time): a colored LED on each disk bay, details on click.
+- Fan calibration: sweeps a zone from 100% to 0% to find where the fans stop and suggest a minimum
+  speed, then keeps the speeds as a reference to warn when a fan gets slower (dust, wear). It stops and
+  goes back to full speed if a temperature reaches its alert limit.
 - Web UI: live overview, curve editor, history (SQLite), manual speed, alerts, settings, journal.
-- Alerts (hot CPU or disk, stopped fan, unreachable BMC) sent to Discord, ntfy, Gotify or any webhook.
+- Alerts (hot CPU or disk, stopped or slowing fan, failing disk or SMART errors going up, unreachable
+  BMC) sent to Discord, ntfy, Gotify or any webhook.
 - Prometheus metrics on `/metrics`.
 - Local BMC (`/dev/ipmi0`) or remote BMC over the network (IPMI over LAN).
 

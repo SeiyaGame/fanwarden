@@ -46,6 +46,10 @@ nvme_high = 70.0
 disk_low = 20.0
 fan_min_rpm = 150
 ipmi_failures = 3
+# A fan this many percent slower than at its calibration (Curves page) raises an alert
+fan_slowdown_percent = 15.0
+# A failing disk, or SMART error counters (reallocated, pending, CRC...) going up
+smart_health = true
 repeat_minutes = 60
 notify_resolved = true
 

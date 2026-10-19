@@ -2,6 +2,7 @@
 
 use std::fmt::Write;
 
+use crate::sensors::{DiskHealth, HealthStatus};
 use crate::state::Snapshot;
 
 const PREFIX: &str = "fanwarden";
@@ -43,6 +44,35 @@ pub fn render(s: &Snapshot) -> String {
             })
             .collect(),
     );
+    let disk_labels =
+        |name: &str, serial: &str| format!("{{name=\"{}\",serial_number=\"{}\"}}", escape(name), escape(serial));
+    let health_gauge = |value: fn(&DiskHealth) -> Option<f64>| -> Vec<(String, f64)> {
+        s.sensors
+            .disks
+            .iter()
+            .filter_map(|d| d.health.as_ref().and_then(value).map(|v| (disk_labels(&d.name, &d.serial), v)))
+            .collect()
+    };
+    gauge(
+        "disk_smart_status",
+        "SMART health of disk: 0 ok, 1 warning (worn or damaged media), 2 failing",
+        health_gauge(|h| {
+            Some(match h.status {
+                HealthStatus::Ok => 0.0,
+                HealthStatus::Warning => 1.0,
+                HealthStatus::Failing => 2.0,
+            })
+        }),
+    );
+    gauge("disk_power_on_hours", "Power-on hours of disk", health_gauge(|h| h.power_on_hours.map(|v| v as f64)));
+    gauge("disk_reallocated_sectors", "Reallocated sectors of disk", health_gauge(|h| h.reallocated.map(|v| v as f64)));
+    gauge(
+        "disk_pending_sectors",
+        "Sectors of disk waiting to be remapped",
+        health_gauge(|h| h.pending.map(|v| v as f64)),
+    );
+    gauge("disk_crc_errors", "Interface CRC errors of disk", health_gauge(|h| h.crc_errors.map(|v| v as f64)));
+    gauge("disk_media_errors", "Media errors of NVMe disk", health_gauge(|h| h.media_errors.map(|v| v as f64)));
     gauge(
         "ipmi_temperature",
         "Temperature sensors of the BMC",
@@ -92,8 +122,21 @@ mod tests {
             FanReading { name: "FAN1".into(), rpm: Some(700), status: "ok".into() },
             FanReading { name: "FAN4".into(), rpm: None, status: "ns".into() },
         ];
+        s.sensors.disks = vec![crate::sensors::DiskInfo {
+            name: "sda".into(),
+            serial: "S1".into(),
+            model: String::new(),
+            kind: crate::sensors::DiskKind::Hdd,
+            state: crate::sensors::DiskState::Active,
+            temperature: Some(35.0),
+            error: None,
+            health: Some(DiskHealth { status: HealthStatus::Warning, reallocated: Some(8), ..DiskHealth::default() }),
+        }];
         let text = render(&s);
         assert!(text.contains("fanwarden_cpu_temperature 41\n"));
+        assert!(text.contains("fanwarden_disk_smart_status{name=\"sda\",serial_number=\"S1\"} 1\n"));
+        assert!(text.contains("fanwarden_disk_reallocated_sectors{name=\"sda\",serial_number=\"S1\"} 8\n"));
+        assert!(!text.contains("fanwarden_disk_pending_sectors{"));
         assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN1\"} 700\n"));
         assert!(text.contains("fanwarden_ipmi_fan_speed{name=\"FAN4\"} -1\n"));
         assert!(text.contains("fanwarden_bmc_up 1\n"));

@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::auth;
+use crate::calibration::{self, CalibrationStatus, Timing};
 use crate::config::{Config, NotificationChannel};
 use crate::notify::{Notification, Severity};
 use crate::state::AppState;
@@ -223,6 +224,68 @@ pub async fn set_manual(
         }
     }
     state.wake.notify_one();
+    Ok(Json(json!({ "ok": true })).into_response())
+}
+
+// ---- Calibration ---------------------------------------------------------------------------
+
+/// Starts sweeping a zone; progress and outcome come through the live snapshot.
+pub async fn start_calibration(State(state): State<Arc<AppState>>, Path(zone): Path<u8>) -> ApiResult {
+    let config = state.config();
+    let Some(name) = config.zones.iter().find(|z| z.id == zone).map(|z| z.name.clone()) else {
+        return Err(ApiError(StatusCode::NOT_FOUND, format!("unknown zone {zone}")));
+    };
+    if !matches!(zone, 0 | 1) {
+        return Err(bad_request("only zones 0 (FAN1…) and 1 (FANA…) have known fans"));
+    }
+    if state.dry_run(&config) {
+        return Err(ApiError(StatusCode::CONFLICT, "dry-run: nothing is written to the BMC".into()));
+    }
+    let Some(bmc) = state.bmc.read().unwrap().clone() else {
+        return Err(ApiError(StatusCode::SERVICE_UNAVAILABLE, "the control loop has not started yet".into()));
+    };
+    if !state.try_start_calibration(zone) {
+        return Err(ApiError(StatusCode::CONFLICT, "a calibration is already running".into()));
+    }
+    // Simulated fans react at once: no need to wait for them.
+    let timing = if state.simulate {
+        Timing { spin_up: Duration::from_secs(2), settle: Duration::from_secs(1) }
+    } else {
+        Timing::default()
+    };
+    tracing::info!("zone {name}: calibration started");
+    let state = state.clone();
+    tokio::spawn(async move {
+        let status = match calibration::run(&state, &bmc, zone, timing).await {
+            Ok(reference) => {
+                match reference.stall_duty {
+                    Some(stall) => tracing::info!(
+                        "zone {name}: calibration done, fans stop at {stall}%, suggested minimum {}%",
+                        reference.suggested_min_duty.unwrap_or(100)
+                    ),
+                    None => tracing::info!("zone {name}: calibration done, no fan stopped"),
+                }
+                if let Err(e) = state.set_reference(reference) {
+                    tracing::warn!("cannot save the calibration: {e:#}");
+                }
+                CalibrationStatus::Done { zone }
+            }
+            Err(e) => {
+                tracing::warn!("zone {name}: calibration failed: {e:#}");
+                CalibrationStatus::Failed { zone, reason: format!("{e:#}") }
+            }
+        };
+        state.set_calibration(status);
+        state.wake.notify_one();
+    });
+    Ok(Json(json!({ "ok": true })).into_response())
+}
+
+pub async fn cancel_calibration(State(state): State<Arc<AppState>>, Path(zone): Path<u8>) -> ApiResult {
+    if state.calibration().and_then(|c| c.running_zone()).is_none_or(|(id, _)| id != zone) {
+        return Err(ApiError(StatusCode::CONFLICT, "no calibration running on this zone".into()));
+    }
+    state.calibration_cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(Json(json!({ "ok": true })).into_response())
 }
 

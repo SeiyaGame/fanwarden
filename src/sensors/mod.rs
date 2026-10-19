@@ -7,7 +7,7 @@ use anyhow::bail;
 use serde::Serialize;
 
 use crate::ipmi::TempReading;
-pub use disks::{DiskInfo, DiskKind, DiskState};
+pub use disks::{DiskHealth, DiskInfo, DiskKind, DiskState, HealthStatus};
 pub use hwmon::HwmonTemp;
 
 /// Everything read from the sensors during one iteration.
@@ -172,6 +172,7 @@ mod tests {
             state,
             temperature: temp,
             error: None,
+            health: None,
         }
     }
 
