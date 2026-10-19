@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tokio::sync::{Notify, broadcast};
@@ -17,6 +18,7 @@ use crate::events::EventLog;
 use crate::history::History;
 use crate::ipmi::FanReading;
 use crate::notify::Notifier;
+use crate::sel::BmcLog;
 use crate::sensors::{SensorData, SourceOption};
 use crate::web::auth::Sessions;
 
@@ -96,9 +98,11 @@ pub struct AppState {
     /// BMC used by the control loop, shared with calibrations.
     pub bmc: RwLock<Option<Bmc>>,
     calibration: Mutex<Option<CalibrationStatus>>,
+    calibration_ended: Mutex<Option<Instant>>,
     pub calibration_cancel: AtomicBool,
     references: RwLock<BTreeMap<u8, Reference>>,
     pub config_history: ConfigHistory,
+    bmc_log: RwLock<BmcLog>,
 }
 
 impl AppState {
@@ -130,9 +134,11 @@ impl AppState {
             force_dry_run,
             bmc: RwLock::new(None),
             calibration: Mutex::new(None),
+            calibration_ended: Mutex::new(None),
             calibration_cancel: AtomicBool::new(false),
             references: RwLock::new(references),
             config_history,
+            bmc_log: RwLock::default(),
         })
     }
 
@@ -141,7 +147,28 @@ impl AppState {
     }
 
     pub fn set_calibration(&self, status: CalibrationStatus) {
+        if status.running_zone().is_none() {
+            *self.calibration_ended.lock().unwrap() = Some(Instant::now());
+        }
         *self.calibration.lock().unwrap() = Some(status);
+    }
+
+    /// A calibration is running, or ended less than `within` ago.
+    pub fn calibrated_within(&self, within: Duration) -> bool {
+        self.calibration().is_some_and(|c| c.running_zone().is_some())
+            || self.calibration_ended.lock().unwrap().is_some_and(|t| t.elapsed() < within)
+    }
+
+    pub fn bmc_log(&self) -> BmcLog {
+        self.bmc_log.read().unwrap().clone()
+    }
+
+    pub fn set_bmc_log(&self, log: BmcLog) {
+        *self.bmc_log.write().unwrap() = log;
+    }
+
+    pub fn update_bmc_log(&self, change: impl FnOnce(&mut BmcLog)) {
+        change(&mut self.bmc_log.write().unwrap());
     }
 
     /// Marks a calibration as started, unless one is already running.

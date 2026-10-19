@@ -13,6 +13,7 @@ pub mod history;
 pub mod ipmi;
 pub mod notify;
 pub mod regulator;
+pub mod sel;
 pub mod sensors;
 pub mod sim;
 pub mod state;

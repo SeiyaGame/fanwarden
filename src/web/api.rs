@@ -165,6 +165,10 @@ pub async fn events(State(state): State<Arc<AppState>>, Query(q): Query<EventsQu
     Json(state.events.since(q.after)).into_response()
 }
 
+pub async fn bmc_events(State(state): State<Arc<AppState>>) -> Response {
+    Json(state.bmc_log()).into_response()
+}
+
 // ---- Configuration -------------------------------------------------------------------------
 
 pub async fn get_config(State(state): State<Arc<AppState>>) -> Response {

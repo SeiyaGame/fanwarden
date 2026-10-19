@@ -20,6 +20,18 @@ pub struct Simulator {
 const HDD_SERIALS: [&str; 6] = ["ZCT3S9M0", "HLH01J2B", "2244E6812B23", "2244E6812A49", "ZR13LBZD", "ZCT3S7WH"];
 /// Seconds for a drive to cover ~63% of the way to its new temperature.
 const HDD_INERTIA_SECS: f32 = 180.0;
+/// BMC event log of the simulated server.
+pub const SEL_INFO: &str = "Entries          : 5
+Percent Used     : 2%
+Last Add Time    : 10/19/2026 14:07:00
+";
+pub const SEL_LIST: &str =
+    "   1 | 10/18/2026 | 09:12:44 | System Boot Initiated #0x00 | Initiated by power up | Asserted
+   2 | 10/19/2026 | 02:13:05 | Power Supply PS2 Status | Power Supply AC lost | Asserted
+   3 | 10/19/2026 | 02:13:41 | Power Supply PS2 Status | Power Supply AC lost | Deasserted
+   4 | 10/19/2026 | 11:48:20 | Memory | Correctable ECC | Asserted | CPU1/P1-DIMMB1
+   5 | 10/19/2026 | 14:07:00 | Temperature Peripheral Temp | Upper Non-critical going high | Asserted
+";
 /// Duty under which the simulated fans stop: CPU zone, peripheral zone.
 const STALL_DUTY: [f32; 2] = [15.0, 20.0];
 

@@ -236,6 +236,32 @@ async fn calibration_starts_once_and_can_be_cancelled() {
 }
 
 #[tokio::test]
+async fn bmc_event_log() {
+    let mut app = logged_in(Config::default()).await;
+    let (status, body, _) = app.call("GET", "/api/bmc/events", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["entries"], json!([]));
+
+    *app.state.bmc.write().unwrap() = Some(Bmc::Sim(Arc::new(Mutex::new(Simulator::default()))));
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    let task = tokio::spawn(fanwarden::sel::task(app.state.clone(), shutdown));
+    for _ in 0..50 {
+        if app.state.bmc_log().updated.is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+
+    let (_, body, _) = app.call("GET", "/api/bmc/events", None).await;
+    assert_eq!(body["percent_used"], 2);
+    assert_eq!(body["entries"].as_array().unwrap().len(), 5);
+    assert_eq!(body["entries"][3]["event"], "Correctable ECC");
+    assert_eq!(body["entries"][3]["severity"], "warning");
+}
+
+#[tokio::test]
 async fn calibration_is_refused_in_dry_run() {
     let mut config = Config::default();
     config.general.dry_run = true;

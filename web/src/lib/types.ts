@@ -182,6 +182,7 @@ export interface Config {
     ipmi_failures: number
     fan_slowdown_percent: number | null
     smart_health: boolean
+    bmc_events: boolean
     repeat_minutes: number
     notify_resolved: boolean
   }
@@ -195,6 +196,25 @@ export interface ConfigVersion {
   origin: { kind: 'startup' | 'ui' | 'file' } | { kind: 'restore'; from_ts: number }
   /** TOML, secrets replaced by `(secret n)`. */
   toml: string
+}
+
+export interface BmcEvent {
+  id: number
+  date: string
+  time: string
+  sensor: string
+  event: string
+  direction: string | null
+  details: string | null
+  severity: 'info' | 'warning' | 'critical'
+}
+
+export interface BmcLog {
+  /** Oldest first. */
+  entries: BmcEvent[]
+  percent_used: number | null
+  updated: number | null
+  error: string | null
 }
 
 export interface LogEvent {

@@ -1,4 +1,12 @@
-import type { Config, ConfigVersion, HistoryData, LogEvent, NotificationChannel, Snapshot } from './types'
+import type {
+  BmcLog,
+  Config,
+  ConfigVersion,
+  HistoryData,
+  LogEvent,
+  NotificationChannel,
+  Snapshot,
+} from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -56,6 +64,7 @@ export const api = {
   setManual: (zone: number, duty: number | null) => request('PUT', `/zones/${zone}/manual`, { duty }),
   startCalibration: (zone: number) => request('POST', `/zones/${zone}/calibration`),
   cancelCalibration: (zone: number) => request('DELETE', `/zones/${zone}/calibration`),
+  bmcEvents: () => request<BmcLog>('GET', '/bmc/events'),
   events: (after = 0) => request<LogEvent[]>('GET', `/events?after=${after}`),
   history: (range: number, prefix: string, points = 600) =>
     request<HistoryData>(

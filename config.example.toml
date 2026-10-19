@@ -50,6 +50,8 @@ ipmi_failures = 3
 fan_slowdown_percent = 15.0
 # A failing disk, or SMART error counters (reallocated, pending, CRC...) going up
 smart_health = true
+# New warnings and failures in the BMC event log: memory errors, power supplies, chassis intrusion...
+bmc_events = true
 repeat_minutes = 60
 notify_resolved = true
 

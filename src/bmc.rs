@@ -46,4 +46,20 @@ impl Bmc {
             Bmc::Sim(sim) => Ok(sim.lock().unwrap().sdr()),
         }
     }
+
+    /// `ipmitool sel info` output.
+    pub async fn sel_info(&self) -> anyhow::Result<String> {
+        match self {
+            Bmc::Ipmi(tool) => tool.sel_info().await,
+            Bmc::Sim(_) => Ok(crate::sim::SEL_INFO.to_string()),
+        }
+    }
+
+    /// `ipmitool sel elist` output.
+    pub async fn sel_list(&self) -> anyhow::Result<String> {
+        match self {
+            Bmc::Ipmi(tool) => tool.sel_list().await,
+            Bmc::Sim(_) => Ok(crate::sim::SEL_LIST.to_string()),
+        }
+    }
 }
