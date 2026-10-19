@@ -38,6 +38,8 @@ pub struct General {
     pub reapply_secs: u64,
     /// Fan mode restored on the BMC when the service stops.
     pub exit_fan_mode: FanMode,
+    /// Look for a new release on GitHub twice a day, to show it in the web UI.
+    pub check_updates: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -244,6 +246,7 @@ impl Default for General {
             failsafe_duty: 100,
             reapply_secs: 300,
             exit_fan_mode: FanMode::Standard,
+            check_updates: true,
         }
     }
 }

@@ -121,6 +121,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
     let control = tokio::spawn(Controller::new(state.clone()).run(shutdown_rx.clone()));
+    tokio::spawn(fanwarden::update::task(state.clone(), shutdown_rx.clone()));
 
     let listener =
         tokio::net::TcpListener::bind(&listen).await.with_context(|| format!("cannot listen on {listen}"))?;

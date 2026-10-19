@@ -11,6 +11,8 @@ dry_run = false
 failsafe_duty = 100
 reapply_secs = 300
 exit_fan_mode = "standard"
+# Look for a new release on GitHub twice a day, to show it in the web UI
+check_updates = true
 
 [ipmi]
 target = "local"

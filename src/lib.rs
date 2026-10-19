@@ -17,6 +17,7 @@ pub mod sel;
 pub mod sensors;
 pub mod sim;
 pub mod state;
+pub mod update;
 pub mod web;
 
 /// Current Unix time in seconds.
