@@ -1,4 +1,4 @@
-import type { Config, HistoryData, LogEvent, NotificationChannel, Snapshot } from './types'
+import type { Config, ConfigVersion, HistoryData, LogEvent, NotificationChannel, Snapshot } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -51,6 +51,8 @@ export const api = {
   config: () => request<Config>('GET', '/config'),
   saveConfig: (config: Config) => request<Config>('PUT', '/config', config),
   reloadConfig: () => request<Config>('POST', '/config/reload'),
+  configHistory: () => request<ConfigVersion[]>('GET', '/config/history'),
+  restoreConfig: (id: number) => request<Config>('POST', `/config/history/${id}/restore`),
   setManual: (zone: number, duty: number | null) => request('PUT', `/zones/${zone}/manual`, { duty }),
   startCalibration: (zone: number) => request('POST', `/zones/${zone}/calibration`),
   cancelCalibration: (zone: number) => request('DELETE', `/zones/${zone}/calibration`),

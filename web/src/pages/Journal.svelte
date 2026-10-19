@@ -1,8 +1,10 @@
 <script lang="ts">
+  import ConfigHistory from '../components/ConfigHistory.svelte'
   import { api } from '../lib/api'
   import type { LogEvent } from '../lib/types'
 
   let events = $state<LogEvent[]>([])
+  let view = $state<'events' | 'config'>('events')
   let filter = $state<'all' | 'problems'>('all')
   const shown = $derived((filter === 'all' ? events : events.filter((e) => e.level !== 'info')).toReversed())
 
@@ -28,6 +30,23 @@
 <div class="page">
   <header class="head">
     <h1>Journal</h1>
+    <div role="group" aria-label="What to show" class="filters">
+      <button
+        class:quiet={view !== 'events'}
+        aria-pressed={view === 'events'}
+        onclick={() => (view = 'events')}>Events</button
+      >
+      <button
+        class:quiet={view !== 'config'}
+        aria-pressed={view === 'config'}
+        onclick={() => (view = 'config')}>Configuration changes</button
+      >
+    </div>
+  </header>
+
+  {#if view === 'config'}
+    <ConfigHistory />
+  {:else}
     <div role="group" aria-label="Filter" class="filters">
       <button class:quiet={filter !== 'all'} aria-pressed={filter === 'all'} onclick={() => (filter = 'all')}
         >Everything</button
@@ -38,18 +57,18 @@
         onclick={() => (filter = 'problems')}>Warnings and errors</button
       >
     </div>
-  </header>
 
-  <ol class="panel log">
-    {#each shown as event (event.id)}
-      <li data-level={event.level}>
-        <time class="soft figure">{time(event.ts)}</time>
-        <span>{event.message}</span>
-      </li>
-    {:else}
-      <li class="soft">Nothing recorded since the service started.</li>
-    {/each}
-  </ol>
+    <ol class="panel log">
+      {#each shown as event (event.id)}
+        <li data-level={event.level}>
+          <time class="soft figure">{time(event.ts)}</time>
+          <span>{event.message}</span>
+        </li>
+      {:else}
+        <li class="soft">Nothing recorded since the service started.</li>
+      {/each}
+    </ol>
+  {/if}
 </div>
 
 <style>
