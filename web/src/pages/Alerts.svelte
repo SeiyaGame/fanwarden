@@ -94,8 +94,7 @@
           counters going up</label
         >
         <label class="check"
-          ><input type="checkbox" bind:checked={config.alerts.bmc_events} /> New warning or failure in the BMC event
-          log: memory errors, power supplies, chassis intrusion…</label
+          ><input type="checkbox" bind:checked={config.alerts.bmc_events} /> New warning or failure in the BMC log</label
         >
         <label class="check"
           ><input type="checkbox" bind:checked={config.alerts.notify_resolved} /> Notify when an alert clears</label

@@ -155,6 +155,8 @@ select {
 input[type='checkbox'] {
   width: 1.05rem;
   height: 1.05rem;
+  /* A long label wraps instead of squeezing the box */
+  flex: none;
   accent-color: var(--control);
 }
 
