@@ -84,19 +84,29 @@
 
   {#if reference && !runningHere}
     {#if reference.bmc_takeover !== null}
-      <p class="note">
-        The BMC raised the fans to full speed at {reference.bmc_takeover}%: a fan went under its RPM
-        threshold. Lower the thresholds (for example
-        <code>ipmitool sensor thresh FAN1 lower 100 200 300</code>) and calibrate again to measure the lowest
-        speeds.
-      </p>
+      <div class="note">
+        <p>
+          The BMC raised the fans to full speed at {reference.bmc_takeover}%: a fan went under one of its
+          lower RPM thresholds, so the sweep stopped there. Check them with
+          <code>ipmitool sensor</code>; if they are high, lower them and calibrate again:
+        </p>
+        <pre>{reference.fans
+            .map((f) => `ipmitool sensor thresh ${f.name} lower 100 200 300`)
+            .join('\n')}</pre>
+      </div>
     {/if}
     {#if reference.suggested_min_duty !== null}
       <div class="suggestion">
         <p>
-          Fans stop at <strong>{reference.stall_duty}%</strong>: minimum speed
-          <strong>{reference.suggested_min_duty}%</strong> suggested, a margin above the lowest speed that
-          still turns them <span class="soft">(now {zone.min_duty}%)</span>.
+          {#if reference.stall_duty !== null}
+            Fans stop at <strong>{reference.stall_duty}%</strong>: minimum speed
+            <strong>{reference.suggested_min_duty}%</strong> suggested, a margin above the lowest speed that still
+            turns them
+          {:else}
+            Minimum speed <strong>{reference.suggested_min_duty}%</strong> suggested, a margin above where the BMC
+            takes over
+          {/if}
+          <span class="soft">(now {zone.min_duty}%)</span>.
         </p>
         <button
           disabled={zone.min_duty === reference.suggested_min_duty}
@@ -186,6 +196,14 @@
   .note {
     border-left: 4px solid var(--warm);
     padding-left: 0.75rem;
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .note pre {
+    margin: 0;
+    font-size: var(--step--1);
+    overflow-x: auto;
   }
 
   .fault {

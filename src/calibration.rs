@@ -51,6 +51,8 @@ pub struct Reference {
     pub fans: Vec<FanCurve>,
     /// Highest duty at which a fan of the zone stopped.
     pub stall_duty: Option<u8>,
+    /// A step and a margin above the lowest duty that is safe: where the fans still turn, or
+    /// where the BMC still leaves them alone.
     pub suggested_min_duty: Option<u8>,
     /// Duty at which the BMC raised the fans on its own (fan below its RPM threshold):
     /// the sweep stopped there.
@@ -154,10 +156,14 @@ impl Sweep {
 
     pub fn finish(self, ts: u64) -> Reference {
         let stall_duty = self.fans.iter().filter_map(|f| f.stall_duty).max();
+        // Without a stall, the BMC stopping the sweep sets the floor: the last step it accepted
+        // sits right at a fan threshold, so stay a step and a margin above it.
+        let lowest_accepted =
+            self.takeover.and_then(|_| self.fans.iter().filter_map(|f| f.points.last()).map(|p| p.0).max());
         Reference {
             zone: self.zone,
             ts,
-            suggested_min_duty: stall_duty.map(|d| (d + STEP + MIN_DUTY_MARGIN).min(100)),
+            suggested_min_duty: stall_duty.or(lowest_accepted).map(|d| (d + STEP + MIN_DUTY_MARGIN).min(100)),
             stall_duty,
             bmc_takeover: self.takeover,
             fans: self.fans,
@@ -377,6 +383,32 @@ mod tests {
         let reference = sweep.finish(0);
         assert_eq!(reference.bmc_takeover, Some(85));
         assert_eq!(reference.fans[0].points, vec![(100, 1800), (95, 1700), (90, 1650)]);
+        // No fan stopped: the floor comes from the last step the BMC accepted (90%).
+        assert_eq!((reference.stall_duty, reference.suggested_min_duty), (None, Some(100)));
+    }
+
+    #[test]
+    fn takeover_near_the_bottom_suggests_a_margin_above_it() {
+        // Fans still turning at 10% (300 RPM, a BMC threshold), the BMC takes over at 5%.
+        let mut sweep = Sweep::new(1);
+        for duty in duties() {
+            let rpm = if duty == 5 { 3000 } else { 300 + duty as u32 * 25 };
+            if !sweep.record(duty, &[fan("FANA", Some(rpm)), fan("FANB", Some(rpm + 100))]) {
+                break;
+            }
+        }
+        let reference = sweep.finish(0);
+        assert_eq!(reference.bmc_takeover, Some(5));
+        assert_eq!((reference.stall_duty, reference.suggested_min_duty), (None, Some(20)));
+    }
+
+    #[test]
+    fn fans_that_never_stop_nor_trigger_the_bmc_suggest_nothing() {
+        let mut sweep = Sweep::new(0);
+        for duty in duties() {
+            sweep.record(duty, &[fan("FAN1", Some(400 + duty as u32 * 18))]);
+        }
+        assert_eq!(sweep.finish(0).suggested_min_duty, None);
     }
 
     fn curve() -> FanCurve {
