@@ -18,6 +18,27 @@ that accepts the X10/X11/X12/H11/H12 fan commands (`raw 0x30 0x70 0x66`).
 - Prometheus metrics on `/metrics`.
 - Local BMC (`/dev/ipmi0`) or remote BMC over the network (IPMI over LAN).
 
+## Screenshots
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
+  <img alt="Overview: zones, disks, fans and temperatures" src="docs/screenshots/overview-light.png">
+</picture>
+
+Curve editor, here holding the disks at 38°C with the curve as a safety net:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/curves-dark.png">
+  <img alt="Curve editor in target temperature mode" src="docs/screenshots/curves-light.png">
+</picture>
+
+History:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/history-dark.png">
+  <img alt="History of temperatures and fan speeds" src="docs/screenshots/history-light.png">
+</picture>
+
 ## Install
 
 Requirements on the server: `ipmitool`, `smartmontools`, `lsblk` (already present on TrueNAS SCALE).
