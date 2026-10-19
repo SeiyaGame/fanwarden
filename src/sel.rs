@@ -286,6 +286,24 @@ Overflow         : false
         assert_eq!(entries[4].summary(), "Fan FANA: Lower Critical going low (Reading 100 < Threshold 200 RPM)");
     }
 
+    /// From an X11 board: time zone after the time, nested parentheses, ids in hex.
+    #[test]
+    fn parses_a_real_supermicro_log() {
+        let text = "   5 | 02/15/26 | 02:57:32 CET | Memory | Correctable ECC (@DIMMH1(CPU1)) | Asserted
+   7 | 11/18/19 | 08:42:01 CET | Fan FANB | Lower Non-recoverable going low  | Asserted | Reading 0 < Threshold 400 RPM
+   9 | 11/18/19 | 08:52:51 CET | Fan FANB | Lower Critical going low  | Deasserted | Reading 2300 > Threshold 500 RPM
+  10 | 11/28/19 | 16:15:09 CET | Fan FANA | Lower Critical going low  | Asserted | Reading 0 < Threshold 200 RPM
+";
+        let entries = parse_list(text);
+        assert_eq!(entries.iter().map(|e| e.id).collect::<Vec<_>>(), [5, 7, 9, 16]);
+        assert_eq!(entries[0].time, "02:57:32 CET");
+        assert_eq!(entries[0].event, "Correctable ECC (@DIMMH1(CPU1))");
+        assert_eq!(entries[0].details, None);
+        use Severity::*;
+        assert_eq!(entries.iter().map(|e| e.severity).collect::<Vec<_>>(), [Warning, Critical, Info, Critical]);
+        assert!(entries[1].is_fan());
+    }
+
     #[test]
     fn ignores_headers_and_garbage() {
         assert!(parse_list("SEL has no entries\n\n zz | a | b | c | d").is_empty());

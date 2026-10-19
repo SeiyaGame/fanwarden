@@ -235,6 +235,14 @@ PS1 Output Power | 101 Watts         | ok
     Power reading state is:                   activated
 ";
         assert_eq!(parse_dcmi_power(text), Some(112.0));
+        // X11 board: the timestamp and the sampling period end up on one line.
+        let x11 = "
+    Instantaneous power reading:                   263 Watts
+    Minimum during sampling period:                258 Watts
+    IPMI timestamp:                           11/28/19 22:12:42 CET    Sampling period:                          00002408 Seconds.
+    Power reading state is:                   activated
+";
+        assert_eq!(parse_dcmi_power(x11), Some(263.0));
         assert_eq!(parse_dcmi_power(&text.replace("activated", "deactivated")), None);
         assert_eq!(parse_dcmi_power("DCMI request failed because: Invalid command (c1)"), None);
     }
