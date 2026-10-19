@@ -2,6 +2,7 @@
 # Installs fanwarden as a systemd service (Debian, Proxmox, TrueNAS SCALE...).
 #
 #   sudo ./install.sh                         download the latest release into /opt/fanwarden
+#   sudo ./install.sh --dev                   the dev pre-release (latest main), to test before a release
 #   sudo ./install.sh --binary ./fanwarden    install a binary you built yourself
 #   sudo ./install.sh --dir /mnt/tank/apps/fanwarden
 #   sudo ./install.sh --service-only --dir DIR   only (re)create the service (TrueNAS post-init)
@@ -10,6 +11,7 @@ set -euo pipefail
 REPO="${FANWARDEN_REPO:-SeiyaGame/fanwarden}"
 DIR=/opt/fanwarden
 BINARY=""
+RELEASE=latest/download
 SERVICE_ONLY=false
 UNIT=/etc/systemd/system/fanwarden.service
 
@@ -17,8 +19,9 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dir) DIR="$2"; shift 2 ;;
     --binary) BINARY="$2"; shift 2 ;;
+    --dev) RELEASE=download/dev; shift ;;
     --service-only) SERVICE_ONLY=true; shift ;;
-    -h | --help) sed -n '2,8p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,9p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -47,7 +50,7 @@ if ! $SERVICE_ONLY; then
   if [ -n "$BINARY" ]; then
     install -m 0755 "$BINARY" "$BIN"
   else
-    url="https://github.com/$REPO/releases/latest/download/fanwarden-x86_64-linux"
+    url="https://github.com/$REPO/releases/$RELEASE/fanwarden-x86_64-linux"
     echo "Downloading $url"
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT

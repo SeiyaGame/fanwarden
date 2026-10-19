@@ -68,6 +68,9 @@ sudo bash install.sh
 sudo bash install.sh --dir /mnt/tank/apps/fanwarden
 ```
 
+To try the next version before its release, `install.sh --dev` installs the `dev` pre-release, rebuilt
+from the main branch on every change (`ghcr.io/seiyagame/fanwarden:dev` for Docker).
+
 Then open `http://<server>:9495` and choose the web password. The configuration is in `config.toml`
 next to the binary; everything can be changed from the UI. `config.example.toml` is a complete example
 (curves tuned to keep hard drives at or below ~40°C). After editing the file by hand, use *Reload the
@@ -84,7 +87,7 @@ docker compose up -d
 ```
 
 Images are published on `ghcr.io/seiyagame/fanwarden`: `latest` and `X.Y.Z` for releases,
-`edge` for the main branch. To build the image yourself: `docker build -t fanwarden .`
+`dev` for the main branch. To build the image yourself: `docker build -t fanwarden .`
 
 | Variable | Default | |
 | -------- | ------- | - |
