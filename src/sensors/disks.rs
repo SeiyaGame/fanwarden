@@ -1,4 +1,4 @@
-//! Disk temperatures through `lsblk` (inventory) and `smartctl --json` (SMART).
+//! Disk temperatures and health through `lsblk` (inventory) and `smartctl --json` (SMART).
 
 use std::time::Duration;
 
@@ -44,6 +44,65 @@ pub struct DiskInfo {
     pub state: DiskState,
     pub temperature: Option<f32>,
     pub error: Option<String>,
+    /// Last SMART health read. Kept from a previous scan while the disk sleeps.
+    pub health: Option<DiskHealth>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum HealthStatus {
+    #[default]
+    Ok,
+    /// Worn or damaged media: reallocated or pending sectors, NVMe media errors or wear.
+    Warning,
+    /// The drive's own self-assessment failed.
+    Failing,
+}
+
+/// SMART counters that tell whether a drive is wearing out. `None`: not reported by this drive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct DiskHealth {
+    pub status: HealthStatus,
+    /// Overall SMART self-assessment (`smartctl -H`).
+    pub passed: Option<bool>,
+    pub power_on_hours: Option<u64>,
+    /// ATA 5, or the grown defect list of SAS drives.
+    pub reallocated: Option<u64>,
+    /// ATA 197: sectors waiting to be remapped.
+    pub pending: Option<u64>,
+    /// ATA 199: transfer errors, usually a bad cable or backplane.
+    pub crc_errors: Option<u64>,
+    /// NVMe.
+    pub media_errors: Option<u64>,
+    /// NVMe: share of the rated endurance used, can exceed 100.
+    pub percentage_used: Option<u64>,
+}
+
+/// NVMe wear from which a drive is flagged.
+const WEAR_WARNING_PERCENT: u64 = 90;
+
+impl DiskHealth {
+    fn assess(&self, nvme_critical_warning: bool) -> HealthStatus {
+        let positive = |v: Option<u64>| v.is_some_and(|v| v > 0);
+        if self.passed == Some(false) || nvme_critical_warning {
+            HealthStatus::Failing
+        } else if positive(self.reallocated)
+            || positive(self.pending)
+            || positive(self.media_errors)
+            || self.percentage_used.is_some_and(|p| p >= WEAR_WARNING_PERCENT)
+        {
+            HealthStatus::Warning
+        } else {
+            HealthStatus::Ok
+        }
+    }
+}
+
+/// A sleeping disk reports nothing: keep the health of the previous scan.
+pub fn keep_known_health(previous: &[DiskInfo], disks: &mut [DiskInfo]) {
+    for disk in disks.iter_mut().filter(|d| d.health.is_none()) {
+        disk.health = previous.iter().find(|p| p.serial == disk.serial).and_then(|p| p.health.clone());
+    }
 }
 
 /// A block device listed by lsblk.
@@ -78,6 +137,7 @@ pub async fn scan(config: &Disks) -> anyhow::Result<Vec<DiskInfo>> {
                 state: DiskState::Error,
                 temperature: None,
                 error: Some(format!("{e:#}")),
+                health: None,
             },
         }
     });
@@ -85,7 +145,7 @@ pub async fn scan(config: &Disks) -> anyhow::Result<Vec<DiskInfo>> {
 }
 
 async fn smartctl(config: &Disks, name: &str) -> anyhow::Result<Smart> {
-    let mut args: Vec<String> = ["--json", "-i", "-A"].map(String::from).to_vec();
+    let mut args: Vec<String> = ["--json", "-i", "-H", "-A"].map(String::from).to_vec();
     if config.skip_standby {
         args.extend(["-n", "standby"].map(String::from));
     }
@@ -129,6 +189,7 @@ pub struct Smart {
     pub temperature: Option<f32>,
     pub serial: Option<String>,
     pub model: Option<String>,
+    pub health: Option<DiskHealth>,
 }
 
 impl Smart {
@@ -148,6 +209,7 @@ impl Smart {
             kind: device.kind,
             state,
             temperature: self.temperature,
+            health: self.health,
         }
     }
 }
@@ -172,17 +234,41 @@ pub fn parse_smartctl(json: &str) -> anyhow::Result<Smart> {
         temperature: if standby { None } else { temperature },
         serial: text(&root["serial_number"]),
         model: text(&root["model_name"]).or_else(|| text(&root["scsi_model_name"])),
+        health: if standby { None } else { parse_health(&root) },
     })
 }
 
-/// Raw value of an ATA SMART attribute (the low byte holds the temperature).
-fn ata_attribute(root: &Value, id: u64) -> Option<f64> {
+fn parse_health(root: &Value) -> Option<DiskHealth> {
+    let nvme = &root["nvme_smart_health_information_log"];
+    let mut health = DiskHealth {
+        status: HealthStatus::Ok,
+        passed: root["smart_status"]["passed"].as_bool(),
+        power_on_hours: root["power_on_time"]["hours"].as_u64().or_else(|| nvme["power_on_hours"].as_u64()),
+        reallocated: ata_raw(root, 5).or_else(|| root["scsi_grown_defect_list"].as_u64()),
+        pending: ata_raw(root, 197),
+        crc_errors: ata_raw(root, 199),
+        media_errors: nvme["media_errors"].as_u64(),
+        percentage_used: nvme["percentage_used"].as_u64(),
+    };
+    if health == DiskHealth::default() {
+        return None;
+    }
+    health.status = health.assess(nvme["critical_warning"].as_u64().is_some_and(|w| w != 0));
+    Some(health)
+}
+
+/// Raw value of an ATA SMART attribute.
+fn ata_raw(root: &Value, id: u64) -> Option<u64> {
     root["ata_smart_attributes"]["table"]
         .as_array()?
         .iter()
         .find(|a| a["id"].as_u64() == Some(id))
         .and_then(|a| a["raw"]["value"].as_u64())
-        .map(|raw| (raw & 0xff) as f64)
+}
+
+/// Temperature from an ATA SMART attribute (the low byte of the raw value).
+fn ata_attribute(root: &Value, id: u64) -> Option<f64> {
+    ata_raw(root, id).map(|raw| (raw & 0xff) as f64)
 }
 
 #[cfg(test)]
@@ -233,5 +319,71 @@ mod tests {
     fn smartctl_nvme() {
         let json = r#"{"model_name":"WD Red SN700","serial_number":"N1","nvme_smart_health_information_log":{"temperature":41}}"#;
         assert_eq!(parse_smartctl(json).unwrap().temperature, Some(41.0));
+    }
+
+    #[test]
+    fn health_of_a_healthy_ata_disk() {
+        let json = r#"{"smart_status":{"passed":true},"power_on_time":{"hours":26543},
+            "ata_smart_attributes":{"table":[
+                {"id":5,"raw":{"value":0}},{"id":197,"raw":{"value":0}},{"id":199,"raw":{"value":3}}]}}"#;
+        let health = parse_smartctl(json).unwrap().health.unwrap();
+        assert_eq!(health.status, HealthStatus::Ok);
+        assert_eq!(health.passed, Some(true));
+        assert_eq!(health.power_on_hours, Some(26543));
+        assert_eq!((health.reallocated, health.pending, health.crc_errors), (Some(0), Some(0), Some(3)));
+        assert_eq!(health.media_errors, None);
+    }
+
+    #[test]
+    fn health_warns_on_bad_sectors_and_fails_on_the_self_assessment() {
+        let json =
+            r#"{"smart_status":{"passed":true},"ata_smart_attributes":{"table":[{"id":197,"raw":{"value":2}}]}}"#;
+        assert_eq!(parse_smartctl(json).unwrap().health.unwrap().status, HealthStatus::Warning);
+
+        let json = r#"{"smart_status":{"passed":false}}"#;
+        assert_eq!(parse_smartctl(json).unwrap().health.unwrap().status, HealthStatus::Failing);
+    }
+
+    #[test]
+    fn health_of_nvme_and_sas() {
+        let json = r#"{"smart_status":{"passed":true},"nvme_smart_health_information_log":
+            {"critical_warning":0,"media_errors":0,"percentage_used":93,"power_on_hours":9100}}"#;
+        let health = parse_smartctl(json).unwrap().health.unwrap();
+        assert_eq!((health.status, health.power_on_hours), (HealthStatus::Warning, Some(9100)));
+
+        let json = r#"{"nvme_smart_health_information_log":{"critical_warning":4,"percentage_used":3}}"#;
+        assert_eq!(parse_smartctl(json).unwrap().health.unwrap().status, HealthStatus::Failing);
+
+        let json = r#"{"smart_status":{"passed":true},"scsi_grown_defect_list":12}"#;
+        let health = parse_smartctl(json).unwrap().health.unwrap();
+        assert_eq!((health.status, health.reallocated), (HealthStatus::Warning, Some(12)));
+    }
+
+    #[test]
+    fn no_health_while_asleep_or_unreported() {
+        let json =
+            r#"{"smartctl":{"messages":[{"string":"Device is in STANDBY mode"}]},"smart_status":{"passed":true}}"#;
+        assert_eq!(parse_smartctl(json).unwrap().health, None);
+        assert_eq!(parse_smartctl(r#"{"temperature":{"current":30}}"#).unwrap().health, None);
+    }
+
+    #[test]
+    fn sleeping_disk_keeps_its_previous_health() {
+        let disk = |serial: &str, health: Option<DiskHealth>| DiskInfo {
+            name: "sda".into(),
+            serial: serial.into(),
+            model: String::new(),
+            kind: DiskKind::Hdd,
+            state: DiskState::Standby,
+            temperature: None,
+            error: None,
+            health,
+        };
+        let known = DiskHealth { passed: Some(true), reallocated: Some(4), ..DiskHealth::default() };
+        let previous = [disk("S1", Some(known.clone()))];
+        let mut now = [disk("S1", None), disk("S2", None)];
+        keep_known_health(&previous, &mut now);
+        assert_eq!(now[0].health, Some(known));
+        assert_eq!(now[1].health, None);
     }
 }

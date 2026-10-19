@@ -1,13 +1,16 @@
 //! State shared between the control loop and the web server.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde::Serialize;
 use tokio::sync::{Notify, broadcast};
 
 use crate::alerts::ActiveAlert;
+use crate::bmc::Bmc;
+use crate::calibration::{self, CalibrationStatus, Reference};
 use crate::config::{Config, FanMode};
 use crate::events::EventLog;
 use crate::history::History;
@@ -27,6 +30,8 @@ pub enum ZoneMode {
     Failsafe,
     /// No rule and no manual duty: the zone is left alone.
     Unmanaged,
+    /// Swept by a calibration.
+    Calibrating,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +71,10 @@ pub struct Snapshot {
     pub zones: Vec<ZoneStatus>,
     pub sources: Vec<SourceOption>,
     pub alerts: Vec<ActiveAlert>,
+    /// Calibration running, or the outcome of the last one.
+    pub calibration: Option<CalibrationStatus>,
+    /// Calibration references by zone.
+    pub references: BTreeMap<u8, Reference>,
 }
 
 pub struct AppState {
@@ -83,6 +92,11 @@ pub struct AppState {
     pub simulate: bool,
     /// `--dry-run` on the command line, on top of the config setting.
     pub force_dry_run: bool,
+    /// BMC used by the control loop, shared with calibrations.
+    pub bmc: RwLock<Option<Bmc>>,
+    calibration: Mutex<Option<CalibrationStatus>>,
+    pub calibration_cancel: AtomicBool,
+    references: RwLock<BTreeMap<u8, Reference>>,
 }
 
 impl AppState {
@@ -95,6 +109,7 @@ impl AppState {
         force_dry_run: bool,
     ) -> Arc<Self> {
         let (live, _) = broadcast::channel(16);
+        let references = calibration::load_references(&calibration::references_path(&config_path));
         Arc::new(Self {
             config_path,
             config: RwLock::new(config),
@@ -108,7 +123,41 @@ impl AppState {
             wake: Notify::new(),
             simulate,
             force_dry_run,
+            bmc: RwLock::new(None),
+            calibration: Mutex::new(None),
+            calibration_cancel: AtomicBool::new(false),
+            references: RwLock::new(references),
         })
+    }
+
+    pub fn calibration(&self) -> Option<CalibrationStatus> {
+        self.calibration.lock().unwrap().clone()
+    }
+
+    pub fn set_calibration(&self, status: CalibrationStatus) {
+        *self.calibration.lock().unwrap() = Some(status);
+    }
+
+    /// Marks a calibration as started, unless one is already running.
+    pub fn try_start_calibration(&self, zone: u8) -> bool {
+        let mut current = self.calibration.lock().unwrap();
+        if current.as_ref().is_some_and(|c| c.running_zone().is_some()) {
+            return false;
+        }
+        self.calibration_cancel.store(false, std::sync::atomic::Ordering::Relaxed);
+        *current = Some(CalibrationStatus::Running { zone, duty: 100, step: 0, steps: calibration::duties().len() });
+        true
+    }
+
+    pub fn references(&self) -> BTreeMap<u8, Reference> {
+        self.references.read().unwrap().clone()
+    }
+
+    /// Stores a new reference and writes the file.
+    pub fn set_reference(&self, reference: Reference) -> anyhow::Result<()> {
+        let mut references = self.references.write().unwrap();
+        references.insert(reference.zone, reference);
+        calibration::save_references(&calibration::references_path(&self.config_path), &references)
     }
 
     pub fn config(&self) -> Config {

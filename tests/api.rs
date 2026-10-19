@@ -1,6 +1,6 @@
 //! HTTP API tests against the real router (no network, no hardware).
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::body::Body;
@@ -9,8 +9,11 @@ use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-use fanwarden::config::{Config, NotificationChannel, SECRET_PLACEHOLDER};
+use fanwarden::bmc::Bmc;
+use fanwarden::calibration::CalibrationStatus;
+use fanwarden::config::{Config, FanMode, NotificationChannel, SECRET_PLACEHOLDER};
 use fanwarden::events::EventLog;
+use fanwarden::sim::Simulator;
 use fanwarden::state::{AppState, Snapshot};
 use fanwarden::web;
 
@@ -176,6 +179,40 @@ async fn manual_duty() {
 
     app.call("PUT", "/api/zones/1/manual", Some(json!({ "duty": null }))).await;
     assert!(app.state.manual.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn calibration_starts_once_and_can_be_cancelled() {
+    let mut app = logged_in(Config::default()).await;
+    assert_eq!(app.call("POST", "/api/zones/1/calibration", None).await.0, StatusCode::SERVICE_UNAVAILABLE);
+
+    let sim = Arc::new(Mutex::new(Simulator::default()));
+    sim.lock().unwrap().mode = FanMode::Full;
+    *app.state.bmc.write().unwrap() = Some(Bmc::Sim(sim));
+    assert_eq!(app.call("POST", "/api/zones/9/calibration", None).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(app.call("POST", "/api/zones/1/calibration", None).await.0, StatusCode::OK);
+    assert_eq!(app.call("POST", "/api/zones/0/calibration", None).await.0, StatusCode::CONFLICT);
+    assert_eq!(app.call("DELETE", "/api/zones/0/calibration", None).await.0, StatusCode::CONFLICT);
+    assert_eq!(app.call("DELETE", "/api/zones/1/calibration", None).await.0, StatusCode::OK);
+
+    let mut status = None;
+    for _ in 0..50 {
+        status = app.state.calibration();
+        if status.as_ref().is_some_and(|s| s.running_zone().is_none()) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert_eq!(status, Some(CalibrationStatus::Failed { zone: 1, reason: "cancelled".into() }));
+}
+
+#[tokio::test]
+async fn calibration_is_refused_in_dry_run() {
+    let mut config = Config::default();
+    config.general.dry_run = true;
+    let mut app = logged_in(config).await;
+    *app.state.bmc.write().unwrap() = Some(Bmc::Sim(Arc::new(Mutex::new(Simulator::default()))));
+    assert_eq!(app.call("POST", "/api/zones/0/calibration", None).await.0, StatusCode::CONFLICT);
 }
 
 #[tokio::test]

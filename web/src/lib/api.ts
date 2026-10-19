@@ -52,6 +52,8 @@ export const api = {
   saveConfig: (config: Config) => request<Config>('PUT', '/config', config),
   reloadConfig: () => request<Config>('POST', '/config/reload'),
   setManual: (zone: number, duty: number | null) => request('PUT', `/zones/${zone}/manual`, { duty }),
+  startCalibration: (zone: number) => request('POST', `/zones/${zone}/calibration`),
+  cancelCalibration: (zone: number) => request('DELETE', `/zones/${zone}/calibration`),
   events: (after = 0) => request<LogEvent[]>('GET', `/events?after=${after}`),
   history: (range: number, prefix: string, points = 600) =>
     request<HistoryData>(

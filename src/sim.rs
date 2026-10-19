@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use crate::config::FanMode;
 use crate::ipmi::{FanReading, SdrReadings, TempReading};
-use crate::sensors::{DiskInfo, DiskKind, DiskState, SensorData};
+use crate::sensors::{DiskHealth, DiskInfo, DiskKind, DiskState, HealthStatus, SensorData};
 
 pub struct Simulator {
     start: Instant,
@@ -20,6 +20,8 @@ pub struct Simulator {
 const HDD_SERIALS: [&str; 6] = ["ZCT3S9M0", "HLH01J2B", "2244E6812B23", "2244E6812A49", "ZR13LBZD", "ZCT3S7WH"];
 /// Seconds for a drive to cover ~63% of the way to its new temperature.
 const HDD_INERTIA_SECS: f32 = 180.0;
+/// Duty under which the simulated fans stop: CPU zone, peripheral zone.
+const STALL_DUTY: [f32; 2] = [15.0, 20.0];
 
 impl Default for Simulator {
     fn default() -> Self {
@@ -52,7 +54,10 @@ impl Simulator {
 
     pub fn sdr(&self) -> SdrReadings {
         let (cpu_duty, periph_duty) = (self.duty(0), self.duty(1));
-        let rpm = |duty: f32, offset: f32| Some((300.0 + duty * 15.0 + offset) as u32);
+        let rpm = |zone: usize, offset: f32| {
+            let duty = [cpu_duty, periph_duty][zone];
+            Some(if duty < STALL_DUTY[zone] { 0 } else { (300.0 + duty * 15.0 + offset) as u32 })
+        };
         let fan = |name: &str, rpm: Option<u32>| FanReading {
             name: name.into(),
             rpm,
@@ -61,12 +66,12 @@ impl Simulator {
         let temp = |name: &str, c: f32| TempReading { name: name.into(), celsius: Some(c.round()) };
         SdrReadings {
             fans: vec![
-                fan("FAN1", rpm(cpu_duty, 0.0)),
-                fan("FAN2", rpm(cpu_duty, 40.0)),
-                fan("FAN3", rpm(cpu_duty, -30.0)),
+                fan("FAN1", rpm(0, 0.0)),
+                fan("FAN2", rpm(0, 40.0)),
+                fan("FAN3", rpm(0, -30.0)),
                 fan("FAN4", None),
-                fan("FANA", rpm(periph_duty, 100.0)),
-                fan("FANB", rpm(periph_duty, 60.0)),
+                fan("FANA", rpm(1, 100.0)),
+                fan("FANB", rpm(1, 60.0)),
             ],
             temperatures: vec![
                 temp("CPU Temp", self.cpu()),
@@ -92,6 +97,8 @@ impl Simulator {
         }
         let hdd = |i: usize, serial: &str| {
             let base = self.hdd_temps[i];
+            // One worn drive, to see a warning in the UI.
+            let reallocated = if i == 3 { 8 } else { 0 };
             DiskInfo {
                 name: format!("sd{}", (b'a' + i as u8) as char),
                 serial: serial.into(),
@@ -100,6 +107,15 @@ impl Simulator {
                 state: DiskState::Active,
                 temperature: Some(base.round()),
                 error: None,
+                health: Some(DiskHealth {
+                    status: if reallocated > 0 { HealthStatus::Warning } else { HealthStatus::Ok },
+                    passed: Some(true),
+                    power_on_hours: Some(31_200 + i as u64 * 1_150),
+                    reallocated: Some(reallocated),
+                    pending: Some(0),
+                    crc_errors: Some(if i == 1 { 2 } else { 0 }),
+                    ..DiskHealth::default()
+                }),
             }
         };
         let mut disks: Vec<DiskInfo> = HDD_SERIALS.iter().enumerate().map(|(i, s)| hdd(i, s)).collect();
@@ -111,6 +127,13 @@ impl Simulator {
             state: DiskState::Standby,
             temperature: None,
             error: None,
+            health: Some(DiskHealth {
+                passed: Some(true),
+                power_on_hours: Some(12_400),
+                reallocated: Some(0),
+                crc_errors: Some(0),
+                ..DiskHealth::default()
+            }),
         });
         disks.push(DiskInfo {
             name: "nvme0n1".into(),
@@ -120,6 +143,13 @@ impl Simulator {
             state: DiskState::Active,
             temperature: Some((44.0 + 5.0 * (t / 60.0).sin()).round()),
             error: None,
+            health: Some(DiskHealth {
+                passed: Some(true),
+                power_on_hours: Some(9_100),
+                media_errors: Some(0),
+                percentage_used: Some(4),
+                ..DiskHealth::default()
+            }),
         });
         let cpu = self.cpu();
         SensorData {

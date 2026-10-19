@@ -25,6 +25,7 @@
     manual: 'Manual',
     failsafe: 'Failsafe — a sensor is missing',
     unmanaged: 'Not controlled',
+    calibrating: 'Calibrating',
   } as const
 
   async function setManual(duty: number | null) {
@@ -81,31 +82,35 @@
   {/if}
 
   <footer>
-    {#if zone.mode === 'manual'}
-      <button class="quiet" onclick={() => setManual(null)}>Return to automatic</button>
-    {/if}
-    {#if editing}
-      <form
-        class="manual"
-        onsubmit={(e) => {
-          e.preventDefault()
-          setManual(manualDuty)
-        }}
-      >
-        <label class="visually-hidden" for="duty-{zone.id}">Fan speed for {zone.name}</label>
-        <input id="duty-{zone.id}" type="range" min="0" max="100" step="1" bind:value={manualDuty} />
-        <span class="figure">{manualDuty}%</span>
-        <button type="submit">Apply</button>
-        <button type="button" class="quiet" onclick={() => (editing = false)}>Cancel</button>
-      </form>
+    {#if zone.mode === 'calibrating'}
+      <p class="soft">Calibration in progress: see the Curves page.</p>
     {:else}
-      <button
-        class="quiet"
-        onclick={() => {
-          manualDuty = zone.duty ?? 60
-          editing = true
-        }}>Set speed manually</button
-      >
+      {#if zone.mode === 'manual'}
+        <button class="quiet" onclick={() => setManual(null)}>Return to automatic</button>
+      {/if}
+      {#if editing}
+        <form
+          class="manual"
+          onsubmit={(e) => {
+            e.preventDefault()
+            setManual(manualDuty)
+          }}
+        >
+          <label class="visually-hidden" for="duty-{zone.id}">Fan speed for {zone.name}</label>
+          <input id="duty-{zone.id}" type="range" min="0" max="100" step="1" bind:value={manualDuty} />
+          <span class="figure">{manualDuty}%</span>
+          <button type="submit">Apply</button>
+          <button type="button" class="quiet" onclick={() => (editing = false)}>Cancel</button>
+        </form>
+      {:else}
+        <button
+          class="quiet"
+          onclick={() => {
+            manualDuty = zone.duty ?? 60
+            editing = true
+          }}>Set speed manually</button
+        >
+      {/if}
     {/if}
     {#if error}<p class="missing">{error}</p>{/if}
   </footer>
@@ -131,7 +136,8 @@
     color: var(--ink-soft);
   }
 
-  [data-mode='manual'] .mode {
+  [data-mode='manual'] .mode,
+  [data-mode='calibrating'] .mode {
     color: var(--ink);
     font-weight: 600;
   }

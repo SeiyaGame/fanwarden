@@ -2,6 +2,7 @@
 
 pub mod alerts;
 pub mod bmc;
+pub mod calibration;
 pub mod config;
 pub mod controller;
 pub mod curve;

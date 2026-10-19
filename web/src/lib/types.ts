@@ -3,8 +3,21 @@
 export type FanMode = 'standard' | 'full' | 'optimal' | 'heavy_io'
 export type DiskKind = 'hdd' | 'ssd' | 'nvme'
 export type DiskState = 'active' | 'standby' | 'error'
-export type ZoneMode = 'auto' | 'manual' | 'failsafe' | 'unmanaged'
+export type ZoneMode = 'auto' | 'manual' | 'failsafe' | 'unmanaged' | 'calibrating'
 export type Severity = 'info' | 'warning' | 'critical'
+export type HealthStatus = 'ok' | 'warning' | 'failing'
+
+/** SMART counters; null when the drive does not report them. */
+export interface DiskHealth {
+  status: HealthStatus
+  passed: boolean | null
+  power_on_hours: number | null
+  reallocated: number | null
+  pending: number | null
+  crc_errors: number | null
+  media_errors: number | null
+  percentage_used: number | null
+}
 
 export interface Disk {
   name: string
@@ -14,6 +27,7 @@ export interface Disk {
   state: DiskState
   temperature: number | null
   error: string | null
+  health: DiskHealth | null
 }
 
 export interface FanReading {
@@ -51,6 +65,27 @@ export interface SourceOption {
   celsius: number | null
 }
 
+export interface FanCurve {
+  name: string
+  /** [duty, rpm] from 100% down; 0 RPM when the fan stopped. */
+  points: [number, number][]
+  stall_duty: number | null
+}
+
+export interface CalibrationReference {
+  zone: number
+  ts: number
+  fans: FanCurve[]
+  stall_duty: number | null
+  suggested_min_duty: number | null
+  bmc_takeover: number | null
+}
+
+export type CalibrationStatus =
+  | { state: 'running'; zone: number; duty: number; step: number; steps: number }
+  | { state: 'done'; zone: number }
+  | { state: 'failed'; zone: number; reason: string }
+
 export interface ActiveAlert {
   key: string
   message: string
@@ -76,6 +111,8 @@ export interface Snapshot {
   zones: ZoneStatus[]
   sources: SourceOption[]
   alerts: ActiveAlert[]
+  calibration: CalibrationStatus | null
+  references: Record<string, CalibrationReference>
 }
 
 export type CurvePoint = [number, number]
@@ -143,6 +180,8 @@ export interface Config {
     disk_low: number | null
     fan_min_rpm: number | null
     ipmi_failures: number
+    fan_slowdown_percent: number | null
+    smart_health: boolean
     repeat_minutes: number
     notify_resolved: boolean
   }

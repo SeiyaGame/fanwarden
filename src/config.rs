@@ -136,6 +136,10 @@ pub struct Alerts {
     pub fan_min_rpm: Option<u32>,
     /// Consecutive failed BMC commands before raising an alert.
     pub ipmi_failures: u32,
+    /// A fan this many percent slower than at its calibration raises an alert.
+    pub fan_slowdown_percent: Option<f32>,
+    /// Failing disks, and SMART error counters going up.
+    pub smart_health: bool,
     pub repeat_minutes: u64,
     pub notify_resolved: bool,
 }
@@ -316,6 +320,8 @@ impl Default for Alerts {
             disk_low: Some(10.0),
             fan_min_rpm: Some(150),
             ipmi_failures: 3,
+            fan_slowdown_percent: Some(15.0),
+            smart_health: true,
             repeat_minutes: 60,
             notify_resolved: true,
         }
@@ -446,6 +452,11 @@ impl Config {
         regex::Regex::new(&self.disks.exclude).context("disks.exclude is not a valid regex")?;
         if self.history.retention_days == 0 {
             bail!("history.retention_days must be at least 1");
+        }
+        if let Some(percent) = self.alerts.fan_slowdown_percent
+            && !(5.0..=50.0).contains(&percent)
+        {
+            bail!("alerts.fan_slowdown_percent must be between 5 and 50");
         }
 
         let mut ids = std::collections::HashSet::new();
