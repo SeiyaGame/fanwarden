@@ -146,7 +146,7 @@ Logs go to the journal (`journalctl -u fanwarden -f`); the last 1000 events are 
 
 | Tool | Version |
 | ---- | ------- |
-| Rust | stable (≥ 1.88), target `x86_64-unknown-linux-musl` for releases |
+| Rust | stable (≥ 1.89), target `x86_64-unknown-linux-musl` for releases |
 | Node | 24 |
 
 ```bash
