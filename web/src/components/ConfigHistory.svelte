@@ -116,9 +116,9 @@
                   <div class="overflow-x-auto rounded-box bg-base-200 py-2 font-mono text-sm leading-normal">
                     {#each withContext(lines) as row, r (r)}
                       {#if row.kind === 'fold'}
-                        <span class="block px-3 text-base-content/60 italic"
-                          >… {row.count} unchanged lines</span
-                        >
+                        <span class="block px-3 text-base-content/60 italic">
+                          … {row.count} unchanged lines
+                        </span>
                       {:else}
                         <span
                           class="block px-3 whitespace-pre {row.kind === 'add'
@@ -126,8 +126,9 @@
                             : row.kind === 'del'
                               ? 'bg-error/20'
                               : ''}"
-                          >{row.kind === 'add' ? '+ ' : row.kind === 'del' ? '- ' : '  '}{row.text}</span
                         >
+                          {row.kind === 'add' ? '+ ' : row.kind === 'del' ? '- ' : '  '}{row.text}
+                        </span>
                       {/if}
                     {/each}
                   </div>
@@ -139,15 +140,15 @@
                   <div class="flex flex-wrap items-center gap-2">
                     {#if confirmId === version.id}
                       <div role="alert" class="alert alert-warning alert-soft w-full">
-                        <span
-                          >Go back to this version?{configStore.dirty
+                        <span>
+                          Go back to this version?{configStore.dirty
                             ? ' Your unsaved changes will be lost.'
-                            : ''}</span
-                        >
+                            : ''}
+                        </span>
                         <div class="flex gap-2">
-                          <button class="btn btn-ghost btn-sm" onclick={() => (confirmId = null)}
-                            >Cancel</button
-                          >
+                          <button class="btn btn-ghost btn-sm" onclick={() => (confirmId = null)}>
+                            Cancel
+                          </button>
                           <button
                             class="btn btn-warning btn-sm"
                             disabled={busy}
@@ -159,9 +160,9 @@
                         </div>
                       </div>
                     {:else}
-                      <button class="btn btn-sm" onclick={() => (confirmId = version.id)}
-                        >Go back to this version</button
-                      >
+                      <button class="btn btn-sm" onclick={() => (confirmId = version.id)}>
+                        Go back to this version
+                      </button>
                     {/if}
                   </div>
                 {/if}

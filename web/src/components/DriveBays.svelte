@@ -121,9 +121,9 @@
             <dt class="text-xs text-base-content/60">Powered on</dt>
             <dd class="font-medium">
               {powerOnText(selected.health.power_on_hours)}
-              <span class="text-sm font-normal text-base-content/60"
-                >({selected.health.power_on_hours.toLocaleString()} h)</span
-              >
+              <span class="text-sm font-normal text-base-content/60">
+                ({selected.health.power_on_hours.toLocaleString()} h)
+              </span>
             </dd>
           </div>
         {/if}

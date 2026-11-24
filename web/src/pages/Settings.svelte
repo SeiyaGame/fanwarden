@@ -94,9 +94,9 @@
             </div>
           {/each}
           <p>
-            <a class="link link-primary" href={update.latest.url} target="_blank" rel="noreferrer"
-              >Release page on GitHub</a
-            >
+            <a class="link link-primary" href={update.latest.url} target="_blank" rel="noreferrer">
+              Release page on GitHub
+            </a>
           </p>
           <p>To update, run the installer again with the folder fanwarden is installed in:</p>
           <div class="mockup-code text-sm">
@@ -144,14 +144,14 @@
             </select>
           </fieldset>
         </div>
-        <label class="label mt-2 cursor-pointer gap-3 whitespace-normal text-base-content"
-          ><input
+        <label class="label mt-2 cursor-pointer gap-3 whitespace-normal text-base-content">
+          <input
             type="checkbox"
             class="toggle toggle-sm toggle-warning"
             bind:checked={config.general.dry_run}
           />
-          Dry run: compute speeds without applying them</label
-        >
+          Dry run: compute speeds without applying them
+        </label>
       </div>
     </section>
 
@@ -242,21 +242,21 @@
       <div class="card-body">
         <h2 id="disks-title" class="card-title">Disks</h2>
         <div class="flex flex-wrap gap-x-8 gap-y-3">
-          <label class="label cursor-pointer gap-3 text-base-content"
-            ><input
+          <label class="label cursor-pointer gap-3 text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.disks.enabled}
             />
-            Read disk temperatures</label
-          >
-          <label class="label cursor-pointer gap-3 text-base-content"
-            ><input
+            Read disk temperatures
+          </label>
+          <label class="label cursor-pointer gap-3 text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.disks.skip_standby}
-            /> Let sleeping disks sleep</label
-          >
+            /> Let sleeping disks sleep
+          </label>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
           <fieldset class="fieldset">
@@ -287,28 +287,28 @@
       <div class="card-body">
         <h2 id="data-title" class="card-title">History and metrics</h2>
         <div class="grid gap-3">
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.history.enabled}
             />
-            Keep a history</label
-          >
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+            Keep a history
+          </label>
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.web.metrics_enabled}
-            /> Publish Prometheus metrics on /metrics</label
-          >
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+            /> Publish Prometheus metrics on /metrics
+          </label>
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.general.check_updates}
-            /> Check GitHub for a new version twice a day</label
-          >
+            /> Check GitHub for a new version twice a day
+          </label>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4">
           <fieldset class="fieldset">

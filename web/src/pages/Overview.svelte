@@ -41,10 +41,10 @@
 
     {#if s.bmc_error}
       <div role="alert" class="alert alert-error">
-        <span
-          ><strong>BMC unreachable.</strong>
-          {s.bmc_error}. Check the IPMI settings, or that ipmitool can reach the board.</span
-        >
+        <span>
+          <strong>BMC unreachable.</strong>
+          {s.bmc_error}. Check the IPMI settings, or that ipmitool can reach the board.
+        </span>
       </div>
     {/if}
 
@@ -109,9 +109,9 @@
               <li class="list-row items-center py-2 {fan.rpm === null ? 'opacity-50' : ''}">
                 <Rotor rpm={fan.rpm} size={30} />
                 <span class="font-medium">{fan.name}</span>
-                <span class="font-figures font-semibold tabular-nums"
-                  >{fan.rpm === null ? 'not connected' : `${fan.rpm} RPM`}</span
-                >
+                <span class="font-figures font-semibold tabular-nums">
+                  {fan.rpm === null ? 'not connected' : `${fan.rpm} RPM`}
+                </span>
               </li>
             {:else}
               <li class="text-base-content/60">The BMC reports no fan.</li>

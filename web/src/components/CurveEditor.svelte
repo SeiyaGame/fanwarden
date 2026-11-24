@@ -281,16 +281,18 @@
           y1={PAD.top}
           y2={H - PAD.bottom}
         />
-        <text class="fill-hot text-xs font-semibold" x={x(safetyFrom) + 6} y={H - PAD.bottom - 8}
-          >Safety curve from {safetyFrom}°</text
-        >
+        <text class="fill-hot text-xs font-semibold" x={x(safetyFrom) + 6} y={H - PAD.bottom - 8}>
+          Safety curve from {safetyFrom}°
+        </text>
         <line class="stroke-mild stroke-3" x1={x(target)} x2={x(target)} y1={PAD.top} y2={H - PAD.bottom} />
         <text
           class="fill-mild text-xs font-semibold"
           x={x(target) - 6}
           y={H - PAD.bottom - 8}
-          text-anchor="end">Target {target}°</text
+          text-anchor="end"
         >
+          Target {target}°
+        </text>
       {:else}
         <path class="fill-none stroke-base-content stroke-[2.5] [stroke-linejoin:round]" d={path} />
       {/if}
@@ -310,9 +312,9 @@
           r="6"
           fill={thermalColor(current, probe)}
         />
-        <text class="fill-base-content text-xs font-semibold" x={x(current) + 8} y={PAD.top + 12}
-          >Now {current}° → {Math.round(currentDuty)}%</text
-        >
+        <text class="fill-base-content text-xs font-semibold" x={x(current) + 8} y={PAD.top + 12}>
+          Now {current}° → {Math.round(currentDuty)}%
+        </text>
       {/if}
     </g>
 
@@ -351,31 +353,31 @@
     {#if selected !== null && points[selected]}
       {@const index = selected}
       <span class="font-semibold">Point {index + 1}</span>
-      <label class="input input-sm w-28"
-        ><input
+      <label class="input input-sm w-28">
+        <input
           type="number"
           aria-label="Temperature"
           value={points[index][0]}
           onchange={(e) => move(index, Number(e.currentTarget.value), points[index][1])}
-        /><span class="label">°C</span></label
-      >
-      <label class="input input-sm w-28"
-        ><input
+        /><span class="label">°C</span>
+      </label>
+      <label class="input input-sm w-28">
+        <input
           type="number"
           aria-label="Fan speed"
           value={points[index][1]}
           min="0"
           max="100"
           onchange={(e) => move(index, points[index][0], Number(e.currentTarget.value))}
-        /><span class="label">%</span></label
-      >
-      <button class="btn btn-ghost btn-sm" disabled={points.length <= 1} onclick={() => remove(index)}
-        >Remove point</button
-      >
+        /><span class="label">%</span>
+      </label>
+      <button class="btn btn-ghost btn-sm" disabled={points.length <= 1} onclick={() => remove(index)}>
+        Remove point
+      </button>
     {:else}
-      <span class="text-base-content/60"
-        >Click the plot to add a point. Drag a point, or select it and use the arrow keys.</span
-      >
+      <span class="text-base-content/60">
+        Click the plot to add a point. Drag a point, or select it and use the arrow keys.
+      </span>
     {/if}
   </p>
 </div>

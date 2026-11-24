@@ -73,8 +73,10 @@
             <button
               class="btn btn-sm btn-error btn-outline"
               onclick={() => config.zones.splice(zi, 1)}
-              title="The BMC keeps the last speed it was given for this zone">Remove zone</button
+              title="The BMC keeps the last speed it was given for this zone"
             >
+              Remove zone
+            </button>
           </header>
 
           <div class="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-4">
@@ -129,16 +131,18 @@
                     {/each}
                   </select>
                 </fieldset>
-                <button class="btn btn-ghost btn-sm mb-1" onclick={() => zone.rules.splice(ri, 1)}
-                  >Remove source</button
-                >
+                <button class="btn btn-ghost btn-sm mb-1" onclick={() => zone.rules.splice(ri, 1)}>
+                  Remove source
+                </button>
               </div>
               <div class="join" role="group" aria-label="How this source drives the fans">
                 <button
                   class="btn join-item btn-sm {rule.target ? '' : 'btn-primary'}"
                   aria-pressed={!rule.target}
-                  onclick={() => (rule.target = null)}>Follow the curve</button
+                  onclick={() => (rule.target = null)}
                 >
+                  Follow the curve
+                </button>
                 <button
                   class="btn join-item btn-sm {rule.target ? 'btn-primary' : ''}"
                   aria-pressed={!!rule.target}
@@ -146,8 +150,10 @@
                     (rule.target = rule.target ?? {
                       celsius: defaultTarget(rule.source),
                       reactivity: 'normal',
-                    })}>Hold a temperature</button
+                    })}
                 >
+                  Hold a temperature
+                </button>
               </div>
               {#if rule.target}
                 <div class="flex flex-wrap items-end gap-x-5 gap-y-2">

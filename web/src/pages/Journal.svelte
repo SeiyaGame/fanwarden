@@ -36,8 +36,10 @@
         <button
           class="tab {view === key ? 'tab-active' : ''}"
           aria-pressed={view === key}
-          onclick={() => (view = key)}>{text}</button
+          onclick={() => (view = key)}
         >
+          {text}
+        </button>
       {/each}
     </div>
   </header>
@@ -49,13 +51,17 @@
       <button
         class="btn join-item btn-sm {filter === 'all' ? 'btn-primary' : 'bg-base-100'}"
         aria-pressed={filter === 'all'}
-        onclick={() => (filter = 'all')}>Everything</button
+        onclick={() => (filter = 'all')}
       >
+        Everything
+      </button>
       <button
         class="btn join-item btn-sm {filter === 'problems' ? 'btn-primary' : 'bg-base-100'}"
         aria-pressed={filter === 'problems'}
-        onclick={() => (filter = 'problems')}>Warnings and errors</button
+        onclick={() => (filter = 'problems')}
       >
+        Warnings and errors
+      </button>
     </div>
 
     {#if view === 'bmc'}

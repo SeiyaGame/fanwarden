@@ -107,29 +107,29 @@
           </fieldset>
         </div>
         <div class="grid gap-3">
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.alerts.smart_health}
             />
-            Disk failing, or its SMART error counters going up</label
-          >
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+            Disk failing, or its SMART error counters going up
+          </label>
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.alerts.bmc_events}
             />
-            New warning or failure in the BMC log</label
-          >
-          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content"
-            ><input
+            New warning or failure in the BMC log
+          </label>
+          <label class="label cursor-pointer gap-3 whitespace-normal text-base-content">
+            <input
               type="checkbox"
               class="toggle toggle-sm toggle-primary"
               bind:checked={config.alerts.notify_resolved}
-            /> Notify when an alert clears</label
-          >
+            /> Notify when an alert clears
+          </label>
         </div>
         <p class="text-sm text-base-content/60">
           A zone running at failsafe speed and a disk that cannot be read always raise an alert.
@@ -143,20 +143,22 @@
         {#each config.notifications as channel, i (i)}
           <div class="grid gap-2 rounded-box border border-base-300 p-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <label class="label cursor-pointer gap-3 text-base-content"
-                ><input
+              <label class="label cursor-pointer gap-3 text-base-content">
+                <input
                   type="checkbox"
                   class="toggle toggle-sm toggle-success"
                   bind:checked={channel.enabled}
                 />
-                <strong>{KINDS.find((k) => k.type === channel.type)?.label}</strong></label
-              >
+                <strong>{KINDS.find((k) => k.type === channel.type)?.label}</strong>
+              </label>
               <div class="flex flex-wrap gap-2">
                 <button class="btn btn-sm" onclick={() => test(channel, i)}>Send a test</button>
                 <button
                   class="btn btn-sm btn-error btn-outline"
-                  onclick={() => config.notifications.splice(i, 1)}>Remove</button
+                  onclick={() => config.notifications.splice(i, 1)}
                 >
+                  Remove
+                </button>
               </div>
             </div>
             <div class="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-4">
@@ -204,9 +206,9 @@
           <select id="new-kind" class="select join-item w-48" bind:value={newKind}>
             {#each KINDS as k (k.type)}<option value={k.type}>{k.label}</option>{/each}
           </select>
-          <button class="btn join-item" onclick={() => config.notifications.push(blank(newKind))}
-            >Add destination</button
-          >
+          <button class="btn join-item" onclick={() => config.notifications.push(blank(newKind))}>
+            Add destination
+          </button>
         </div>
       </div>
     </section>
