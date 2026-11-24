@@ -56,10 +56,10 @@
       {/if}
       {#if log?.percent_used != null && log.percent_used >= 90}
         <div role="alert" class="alert alert-error alert-soft">
-          <span
-            >Almost full: the BMC may stop recording. Once you have read it, clear it with
-            <code class="font-mono">ipmitool sel clear</code>.</span
-          >
+          <span>
+            Almost full: the BMC may stop recording. Once you have read it, clear it with
+            <code class="font-mono">ipmitool sel clear</code>.
+          </span>
         </div>
       {/if}
     </header>
@@ -88,17 +88,20 @@
                 <strong>{entry.sensor}</strong>: {entry.event}
                 <span class="text-base-content/60">{note(entry)}</span>
               </div>
-              <time class="font-figures text-xs text-base-content/60 tabular-nums"
-                >{entry.date} {entry.time}</time
-              >
+              <time class="font-figures text-xs text-base-content/60 tabular-nums">
+                {entry.date}
+                {entry.time}
+              </time>
             </div>
             <span
               class="badge badge-sm {entry.severity === 'critical'
                 ? 'badge-error'
                 : entry.severity === 'warning'
                   ? 'badge-warning'
-                  : 'badge-ghost'}">{SEVERITY_TEXT[entry.severity]}</span
+                  : 'badge-ghost'}"
             >
+              {SEVERITY_TEXT[entry.severity]}
+            </span>
           </li>
         {:else}
           <li class="list-row text-base-content/60">

@@ -78,8 +78,10 @@
         class="btn btn-sm"
         disabled={!!running || !saved}
         title={!saved ? 'Save the zone first' : running ? 'Another zone is being calibrated' : undefined}
-        onclick={() => act(() => api.startCalibration(zone.id))}>Calibrate</button
+        onclick={() => act(() => api.startCalibration(zone.id))}
       >
+        Calibrate
+      </button>
     </div>
   {/if}
 
@@ -118,8 +120,9 @@
           class="btn btn-sm btn-primary"
           disabled={zone.min_duty === reference.suggested_min_duty}
           onclick={() => (zone.min_duty = reference.suggested_min_duty ?? zone.min_duty)}
-          >Use {reference.suggested_min_duty}%</button
         >
+          Use {reference.suggested_min_duty}%
+        </button>
       </div>
     {:else if reference.bmc_takeover === null}
       <p>No fan stopped, even at 0%: the minimum speed can be as low as you like.</p>

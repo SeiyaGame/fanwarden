@@ -63,8 +63,10 @@
         <button
           class="tab {range === r.seconds ? 'tab-active' : ''}"
           aria-pressed={range === r.seconds}
-          onclick={() => (range = r.seconds)}>{r.label}</button
+          onclick={() => (range = r.seconds)}
         >
+          {r.label}
+        </button>
       {/each}
     </div>
   </header>

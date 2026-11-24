@@ -79,9 +79,10 @@
                 ></span>
                 {sourceLabel(rule.source)}
                 {#if rule.target !== null}
-                  <span class="badge badge-xs ml-1 {rule.emergency ? 'badge-error' : 'badge-ghost'}"
-                    >{rule.emergency ? 'far above target' : 'target'} {rule.target}°</span
-                  >
+                  <span class="badge badge-xs ml-1 {rule.emergency ? 'badge-error' : 'badge-ghost'}">
+                    {rule.emergency ? 'far above target' : 'target'}
+                    {rule.target}°
+                  </span>
                 {/if}
               </td>
               <td class="text-right font-figures tabular-nums">
@@ -130,8 +131,10 @@
           onclick={() => {
             manualDuty = zone.duty ?? 60
             editing = true
-          }}>Set speed manually</button
+          }}
         >
+          Set speed manually
+        </button>
       {/if}
       {#if error}<p class="w-full text-error">{error}</p>{/if}
     </footer>

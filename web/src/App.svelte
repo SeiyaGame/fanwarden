@@ -84,9 +84,9 @@
     <div class="drawer-content flex min-w-0 flex-col">
       <header class="navbar sticky top-0 z-20 border-b border-base-300 bg-base-100 lg:hidden">
         <label for="nav-drawer" class="btn btn-square btn-ghost" aria-label="Open the menu">
-          <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="2"
-            ><path d="M4 6h16M4 12h16M4 18h16" /></svg
-          >
+          <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </label>
         <a class="flex items-center gap-2 px-2 text-lg font-semibold" href="#/">
           <Rotor rpm={cpuRpm} size={26} color="var(--color-accent)" />
@@ -159,8 +159,10 @@
                 {#if p.path === 'alerts' && snapshot?.alerts.length}
                   <span
                     class="badge badge-sm badge-error ml-auto font-figures"
-                    aria-label="{snapshot.alerts.length} active">{snapshot.alerts.length}</span
+                    aria-label="{snapshot.alerts.length} active"
                   >
+                    {snapshot.alerts.length}
+                  </span>
                 {/if}
               </a>
             </li>
@@ -169,15 +171,16 @@
 
         <div class="mt-auto flex flex-col gap-2 text-sm">
           {#if updates.status?.available && updates.status.latest}
-            <a class="alert alert-success alert-soft px-3 py-2" href="#/settings"
-              >Version {updates.status.latest.version} is available</a
-            >
+            <a class="alert alert-success alert-soft px-3 py-2" href="#/settings">
+              Version {updates.status.latest.version} is available
+            </a>
           {/if}
-          {#if snapshot?.simulate}<span class="badge badge-warning badge-soft w-full">Simulated hardware</span
-            >{/if}
-          {#if snapshot?.dry_run}<span class="badge badge-warning badge-soft h-auto w-full py-1"
-              >Dry run: speeds are not applied</span
-            >{/if}
+          {#if snapshot?.simulate}<span class="badge badge-warning badge-soft w-full">
+              Simulated hardware
+            </span>{/if}
+          {#if snapshot?.dry_run}<span class="badge badge-warning badge-soft h-auto w-full py-1">
+              Dry run: speeds are not applied
+            </span>{/if}
           <span class="flex items-center gap-2 px-1 text-base-content/60">
             <span class="status {live.connected ? 'status-success' : 'status-error'}"></span>
             {live.connected ? 'Live' : 'Reconnecting…'}
